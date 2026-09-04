@@ -98,7 +98,7 @@ export function parseSiwsMessage(text: string): SiwsMessage | null {
       : undefined
 
   return {
-    domain: header[1],
+    domain: header[1]!,
     address,
     statement,
     uri,

@@ -63,7 +63,7 @@ export function parseSiweMessage(text: string): SiweMessage | null {
   const statementLines = lines.slice(2, uriIndex).filter((l) => l.trim() !== '')
 
   return {
-    domain: header[1],
+    domain: header[1]!,
     address,
     statement: statementLines.length ? statementLines.join('\n') : undefined,
     uri,

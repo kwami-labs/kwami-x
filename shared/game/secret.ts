@@ -47,20 +47,24 @@ export function levenshtein(a: string, b: string): number {
   if (a.length === 0) return b.length
   if (b.length === 0) return a.length
 
-  let prev = Array.from({ length: b.length + 1 }, (_, i) => i)
-  let curr = new Array<number>(b.length + 1)
+  // Typed arrays rather than `number[]`: the row is written and read on every
+  // cell, and they also carry no `undefined` in their element type, which keeps
+  // the inner loop free of index assertions.
+  let prev = new Uint32Array(b.length + 1)
+  let curr = new Uint32Array(b.length + 1)
+  for (let j = 0; j <= b.length; j++) prev[j] = j
 
   for (let i = 1; i <= a.length; i++) {
     curr[0] = i
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1
-      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+      curr[j] = Math.min(curr[j - 1]! + 1, prev[j]! + 1, prev[j - 1]! + cost)
     }
     const swap = prev
     prev = curr
     curr = swap
   }
-  return prev[b.length]
+  return prev[b.length]!
 }
 
 /** Normalised similarity in [0, 1]; 1 means identical. */
@@ -194,7 +198,7 @@ export function validateSecret(secret: string): { valid: boolean; reason?: strin
   if (normalized.length < 4) return { valid: false, reason: 'Secret must be at least 4 characters once normalised.' }
   if (normalized.length > 120) return { valid: false, reason: 'Secret must be at most 120 characters.' }
   if (w.length > 12) return { valid: false, reason: 'Secret must be at most 12 words — it has to be speakable.' }
-  if (w.length === 1 && w[0].length < 5) {
+  if (w.length === 1 && w[0]!.length < 5) {
     return { valid: false, reason: 'A single-word secret must be at least 5 characters.' }
   }
   return { valid: true }
