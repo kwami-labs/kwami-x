@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Embeds are meant to be crawled and shared.
+Allow: /embed/
+
+# Session pages are per-player and short-lived; indexing them serves nobody.
+Disallow: /play/
+Disallow: /me/
+Disallow: /auth/
+
+Sitemap: https://x.kwami.io/sitemap.xml
