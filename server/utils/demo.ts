@@ -124,7 +124,10 @@ export const DEMO_KWAMIS: DemoKwami[] = [
     tagline: 'The first Kwami. Down to its last breath.',
     persona: 'Ancient and tired. Speaks in fragments. Wants to be beaten but cannot say so.',
     renderer: 'stars-genesis',
-    balance_lamports: 62_000_000,
+    // Deliberately just above the 1% drawdown line: $24 against a $2,100 peak
+    // is 1.14% vitality, which renders as a flickering sliver and is the whole
+    // point of this entry. Dropping below it would make the row `dead`.
+    balance_lamports: 160_000_000,
     high_water_mark_cents: 210_000,
     sessions_played: 301,
     sessions_won: 4,
