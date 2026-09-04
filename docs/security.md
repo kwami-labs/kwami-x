@@ -54,9 +54,17 @@ RLS restricts transcripts to the player. A Kwami's author never sees how challen
 
 `redactSecret` runs over every generated reply before it is returned. A model told "never reveal the secret" will still leak it to a sufficiently clever challenger — that is the game — but it must not leak it by accident, and no prompt is reliable enough to make that impossible. So the check happens in code, after generation, where it cannot be talked around.
 
+### Framing
+
+`server/middleware/security-headers.ts` sets `frame-ancestors 'none'` and `X-Frame-Options: DENY` on every route except `/embed/**` and `/embed.js`, which set `frame-ancestors *` because being framed by strangers is their entire purpose.
+
+That split matters: a framed mint or claim page is a clickjacking primitive for transactions worth real money. `X-Frame-Options` has no allow-list form, so the embed routes omit it and rely on CSP.
+
+The middleware also sets `Permissions-Policy` allowing only the microphone — the whole game — and denying camera, geolocation and the rest.
+
 ### Path traversal
 
-`/api/docs/:slug` resolves and normalises before reading, and rejects anything outside `docs/`. The slug comes from a URL, so `../../.env` is one careless `join` away from being served as documentation.
+`/api/docs/:slug` accepts only `^[a-z0-9][a-z0-9-]{0,63}$` — a path segment, not a path. It also reads through Nitro's server-asset storage rather than the filesystem, so there is no `join` to get wrong. The slug comes from a URL, and `../../.env` is one careless path concatenation away from being served as documentation.
 
 ## Not yet done
 
