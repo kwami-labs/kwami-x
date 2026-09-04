@@ -79,6 +79,16 @@ NUXT_ANTHROPIC_API_KEY=sk-ant-...
 
 Without it, the Kwami is a scripted deflector — impossible to beat by argument, which is the wrong difficulty curve for real play but exactly right for checking the loop end to end.
 
+For streaming voice over WebRTC instead of the browser API:
+
+```env
+NUXT_PUBLIC_LIVEKIT_URL=wss://your-project.livekit.cloud
+NUXT_LIVEKIT_API_KEY=
+NUXT_LIVEKIT_API_SECRET=
+```
+
+This repository mints the room tokens. The agent worker that joins the room and speaks as the Kwami is a separate service — see [Architecture](/docs/architecture#voice-and-where-it-stops). With the variables unset, `/api/session/:id/voice-token` reports `transport: "browser"` and the game runs on the Web Speech path.
+
 ### 5. On-ramp
 
 ```env

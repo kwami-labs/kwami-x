@@ -69,6 +69,16 @@ The salt is generated server-side. A client-chosen salt would let a malicious au
 
 Step 2. Verifies the mint transaction against the cluster — that it succeeded, that it involves this mint, and that it called the Kwami program — before binding the draft to the mint address.
 
+### `GET /api/kwami/:mint/metadata`
+
+The NFT's off-chain metadata document, in Metaplex's standard schema. This is the URI written on chain at mint, so it is what Phantom, Magic Eden and Tensor read.
+
+`animation_url` points at `/embed/<mint>`, so what a wallet renders is the live 3D Kwami rather than a static file. Cached for 30 seconds — long enough to protect the database, short enough that the pot a marketplace shows is roughly current.
+
+### `GET /api/kwami/:mint/image.svg`
+
+The static thumbnail, generated per request. Draws the current pot and a vitality ring using the same mint-derived palette and square-root scale as the app. SVG because it has to say something current, and because every NFT client renders it without an image pipeline behind it.
+
 ## Sessions
 
 ### `POST /api/session/start` — auth
@@ -103,6 +113,17 @@ A win is the **only** circumstance under which claim material leaves the server.
 ### `POST /api/session/:id/reply` — auth, player only
 
 Asks the Kwami to answer. Runs server-side because the persona prompt contains the secret — the model needs it to steer *around* it.
+
+### `POST /api/session/:id/voice-token` — auth, player only
+
+Issues a LiveKit token scoped to this session's room, expiring in five minutes.
+
+```json
+← { "transport": "livekit", "url": "wss://…", "room": "kwami-…", "token": "…" }
+← { "transport": "browser" }   // when LiveKit is not configured
+```
+
+Reports `transport: "browser"` rather than failing when LiveKit is absent, so the client falls back to the Web Speech path instead of the session dying. The token never grants room admin — a player must not be able to evict the agent from the room they are trying to beat.
 
 ### `POST /api/session/:id/claimed` — auth, player only
 

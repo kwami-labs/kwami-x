@@ -21,6 +21,12 @@ export class BorshWriter {
     return this.push(buf)
   }
 
+  u32(value: number): this {
+    const buf = new Uint8Array(4)
+    new DataView(buf.buffer).setUint32(0, value, true)
+    return this.push(buf)
+  }
+
   u64(value: bigint | number): this {
     const buf = new Uint8Array(8)
     new DataView(buf.buffer).setBigUint64(0, BigInt(value), true)
@@ -42,11 +48,14 @@ export class BorshWriter {
     return this.push(bytes)
   }
 
+  /** A Borsh `String`: a u32 byte-length followed by UTF-8 bytes. */
+  string(value: string): this {
+    return this.bytes(new TextEncoder().encode(value))
+  }
+
   /** A `Vec<u8>`: a u32 length followed by the bytes. */
   bytes(value: Uint8Array): this {
-    const len = new Uint8Array(4)
-    new DataView(len.buffer).setUint32(0, value.length, true)
-    return this.push(len).push(value)
+    return this.u32(value.length).push(value)
   }
 
   /** A Rust fieldless enum: one byte holding the variant index. */

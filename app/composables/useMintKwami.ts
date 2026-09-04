@@ -6,6 +6,8 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js'
 import { createKwamiIx } from '#shared/solana/instructions'
+import { createMetadataV3Ix, MAX_NAME_LENGTH } from '#shared/solana/token-metadata'
+import { SECONDARY_ROYALTY_BPS } from '#shared/game/constants'
 import type { KwamiRenderer, ResolutionMode } from '#shared/types/kwami'
 
 export interface MintDraft {
@@ -36,6 +38,10 @@ export type MintPhase = 'idle' | 'committing' | 'building' | 'signing' | 'confir
  *
  * Phantom's `signAndSendTransaction` carries the whole bundle, so the user sees
  * one decoded prompt listing exactly what is being created.
+ *
+ * The bundle also writes Metaplex metadata, pointed at a live JSON endpoint
+ * rather than a file on IPFS. A Kwami's headline number is its pot, and a
+ * document pinned at mint would advertise `$0.00` for the rest of its life.
  *
  * `@solana/spl-token` is imported dynamically rather than at module scope. The
  * mint transaction is built and signed entirely in the browser, so the library
@@ -113,6 +119,18 @@ export function useMintKwami() {
         createInitializeMint2Instruction(mint, 0, creator, creator),
         createAssociatedTokenAccountInstruction(creator, creatorAta, creator, mint),
         createMintToInstruction(mint, creatorAta, creator, 1),
+        // Metadata must be created while `creator` still holds mint authority,
+        // which the next instruction revokes. Without this the token is a
+        // number in a ledger: "Unknown Token" in Phantom, and unlistable on
+        // every marketplace.
+        createMetadataV3Ix({
+          mint,
+          creator,
+          name: draft.name.slice(0, MAX_NAME_LENGTH),
+          symbol: 'KWAMI',
+          uri: `${config.public.siteUrl}/api/kwami/${mint.toBase58()}/metadata`,
+          sellerFeeBasisPoints: SECONDARY_ROYALTY_BPS,
+        }),
         // Revoking the mint authority is what makes the NFT provably unique —
         // without it the author could mint a second copy of the same Kwami at
         // any time and the scarcity claim would be worthless.

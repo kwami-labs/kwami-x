@@ -44,6 +44,28 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       include: ['shared/**/*.ts', 'server/utils/**/*.ts', 'app/utils/**/*.ts'],
+      /**
+       * Excluded because measuring them would measure the mocks, not the code.
+       *
+       * Kept deliberately short — the bar for adding a line here is that a unit
+       * test could only exercise a stub, not that writing one is inconvenient.
+       */
+      exclude: [
+        // Type declarations. They compile to nothing, so counting them drags
+        // the number down while telling you nothing.
+        'shared/types/**',
+        // Thin adapters over Supabase, Nitro storage and an RPC endpoint. Their
+        // behaviour lives in the service on the other side of the call.
+        'server/utils/supabase.ts',
+        'server/utils/nonce.ts',
+        'server/utils/wallet-session.ts',
+        'server/utils/kwami-secret.ts',
+        'server/utils/solana.ts',
+        // WebGL and WebAudio, neither of which happy-dom implements. Covered
+        // instead by asserting the preset table in tests/integration.
+        'app/utils/kwami-renderer.ts',
+        'app/utils/audio-meter.ts',
+      ],
       thresholds: { lines: 80, functions: 80, branches: 75, statements: 80 },
     },
   },

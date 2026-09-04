@@ -49,6 +49,14 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'bun',
     /**
+     * Nitro runs its own esbuild pass with its own target, so the Vite setting
+     * below does not reach it. Every lamport amount here is a `bigint` literal,
+     * and under the default es2019 esbuild warns they "may crash at run-time" —
+     * which, in a handler that validates ticket prices, would be a crash while
+     * money is being committed.
+     */
+    esbuild: { options: { target: 'es2020' } },
+    /**
      * Bundle `docs/` into the server build.
      *
      * The docs route reads markdown at request time. Reading it from
@@ -70,6 +78,14 @@ export default defineNuxtConfig({
       include: ['@solana/web3.js', 'bs58', 'tweetnacl'],
     },
     define: { global: 'globalThis' },
+    /**
+     * ES2020 or later, because every lamport amount in this app is a `bigint`
+     * literal. Under the default es2019 target esbuild warns that they "may
+     * crash at run-time" — and a crash while building a payment transaction is
+     * the worst possible place for one.
+     */
+    esbuild: { target: 'es2020' },
+    build: { target: 'es2020' },
   },
 
   app: {
