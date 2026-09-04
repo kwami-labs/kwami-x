@@ -38,7 +38,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 | `shared/` | Pure domain logic: game economics, secret matching, session state, Solana encoding |
 | `programs/kwami-vault/` | The Anchor program — escrow, sessions, settlement |
 | `supabase/migrations/` | Schema, row level security, read models |
-| `tests/` | 185 Vitest tests over the domain and utility layers |
+| `tests/` | 250 Vitest tests over the domain and utility layers |
 | `docs/` | Full documentation, also served at `/docs` |
 
 ## The interesting parts
@@ -60,7 +60,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 ```bash
 bun run dev            # development server
 bun run build          # production build (Bun preset)
-bun run test           # 185 tests
+bun run test           # 250 tests
 bun run test:coverage  # with thresholds
 bun run typecheck      # vue-tsc over the project
 bun run lint           # ESLint
@@ -77,7 +77,14 @@ bun run db:push        # apply Supabase migrations
 
 ## Status
 
-The application, the domain layer and the documentation are complete and tested. The Anchor program is written and reviewed but **has not been audited or deployed** — see [docs/security.md](docs/security.md#not-yet-done) for the honest list of what is not finished.
+The application, the domain layer and the documentation are complete and tested: 250 tests, 93% coverage of the logic layers, clean typecheck and lint, and a production build that serves every route.
+
+Two things are deliberately not finished, and neither is hidden:
+
+- **The Anchor program has not been compiled, audited or deployed.** It is written and reviewed, and the TypeScript suite pins the semantics it must reproduce — but building it needs the Anchor toolchain, which is not part of this repository's default setup. Do not put real money behind it.
+- **The LiveKit voice agent is a separate service.** This repo mints the room tokens; the worker that joins the room and speaks as the Kwami runs elsewhere. The game is fully playable in the meantime on the browser Web Speech path, which needs no infrastructure at all.
+
+See [docs/security.md](docs/security.md#not-yet-done) for the rest of the honest list.
 
 ## License
 
