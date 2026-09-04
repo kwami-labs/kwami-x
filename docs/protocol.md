@@ -51,6 +51,34 @@ An opt-in record binding a Kwami to an owner-authored sub-program. See [Program 
 | `withdraw_sol` / `withdraw_usdc` | owner | Only while unpublished or after death |
 | `register_extension` | owner | Attaches a sub-program, before first publish |
 
+## The NFT
+
+`create_kwami` runs inside a single transaction that also mints the token, hands the one unit to the creator, writes Metaplex metadata and revokes the mint authority. Bundling matters: split across transactions, a failure between them leaves an NFT with no Kwami behind it — or a mint someone else can race to claim — and the user is holding a broken half-object with real SOL spent on it.
+
+Two properties come out of that ordering:
+
+**It is provably unique.** The mint authority is revoked in the same transaction, so no second copy can ever exist.
+
+**It is immutable.** The metadata is written with `isMutable: false`. A Kwami's name and image are as fixed as its game rules — an owner cannot rename one, or repoint its image, after people have paid to play it.
+
+Metadata is created *before* the authority is revoked, because the Token Metadata program requires the mint authority to sign.
+
+### Metadata that stays current
+
+The metadata URI points at `/api/kwami/<mint>/metadata` — a live endpoint, not a document pinned to IPFS at mint. A Kwami's headline number is its pot, and a pinned document would advertise `$0.00` for the rest of its life.
+
+The `animation_url` points at `/embed/<mint>`, so the object a wallet or marketplace renders is the **live 3D Kwami**: its real pot, its real vitality, visibly deflating as it dies. A `.glb` file would be a snapshot of a thing whose entire point is that it changes.
+
+The static `image` is generated SVG for the same reason — it draws the current pot and a vitality ring, using the same mint-derived palette and square-root scale as the app, so the thumbnail, the card and the live object are recognisably the same being.
+
+### Buying and selling
+
+Kwami does not ship a marketplace. It does not need one: the token is a standard SPL NFT with standard Metaplex metadata, so Magic Eden, Tensor and every Solana wallet handle it natively.
+
+What the protocol does provide is `sync_owner`, which points `Kwami::owner` at whoever currently holds the token. It is **permissionless** — it only ever copies the token account's authority across — so a buyer is never locked out by a seller who declines to hand over.
+
+A 1% secondary royalty goes to the original author, matching what they earn on every ticket, so the incentive to seed a Kwami well is the same whether it is played or flipped.
+
 ## How a win is proven
 
 This is the part that matters. The conversation is off chain — voice, speech recognition, a language model — and none of it can be trusted to decide who gets paid. There are two answers, chosen per Kwami at mint.
