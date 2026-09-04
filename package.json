@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "packageManager": "bun@1.2.18",
-  "description": "Kwami v3 — Solana NFT companions with on-chain voice games, AI program builder and embeddable 3D avatars.",
+  "description": "Kwami v3 \u2014 Solana NFT companions with on-chain voice games, AI program builder and embeddable 3D avatars.",
   "engines": {
     "bun": ">=1.2.0",
     "node": ">=20.0.0"
@@ -30,8 +30,8 @@
     "db:types": "supabase gen types typescript --local > shared/types/database.ts"
   },
   "dependencies": {
-    "@noble/curves": "^2.4.0",
-    "@noble/hashes": "^2.4.0",
+    "@noble/curves": "^1.9.0",
+    "@noble/hashes": "^1.8.0",
     "@nuxtjs/color-mode": "^4.0.1",
     "@pinia/nuxt": "^1.0.2",
     "@solana/spl-token": "^0.4.14",
@@ -62,5 +62,8 @@
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "vue-tsc": "^3.1.4"
+  },
+  "overrides": {
+    "bigint-buffer": "file:./shims/bigint-buffer"
   }
 }

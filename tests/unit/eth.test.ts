@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { keccak_256 } from '@noble/hashes/sha3.js'
+import { secp256k1 } from '@noble/curves/secp256k1'
+import { keccak_256 } from '@noble/hashes/sha3'
 import { eip191Digest, recoverEthAddress, toChecksumAddress } from '~~/server/utils/eth'
 
 /** Sign a message the way MetaMask's `personal_sign` does: r || s || v, v last. */
 function personalSign(message: string, privateKey: Uint8Array): string {
   const digest = eip191Digest(message)
-  const raw = secp256k1.sign(digest, privateKey, { prehash: false, format: 'recovered' })
-  const recovery = raw[0]
-  const compact = raw.slice(1)
-  return `0x${Buffer.from(compact).toString('hex')}${(recovery + 27).toString(16).padStart(2, '0')}`
+  const sig = secp256k1.sign(digest, privateKey, { prehash: false })
+  const compact = sig.toCompactRawBytes()
+  return `0x${Buffer.from(compact).toString('hex')}${(sig.recovery! + 27).toString(16).padStart(2, '0')}`
 }
 
 function addressOf(privateKey: Uint8Array): string {
@@ -18,7 +17,7 @@ function addressOf(privateKey: Uint8Array): string {
 }
 
 describe('recoverEthAddress', () => {
-  const key = secp256k1.utils.randomSecretKey()
+  const key = secp256k1.utils.randomPrivateKey()
   const address = addressOf(key)
 
   it('recovers the signer of a personal_sign signature', () => {

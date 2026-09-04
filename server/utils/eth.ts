@@ -1,5 +1,5 @@
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { keccak_256 } from '@noble/hashes/sha3.js'
+import { secp256k1 } from '@noble/curves/secp256k1'
+import { keccak_256 } from '@noble/hashes/sha3'
 import { EIP191_PREFIX_BYTE, eip191Preamble } from '#shared/auth/siwe'
 
 /**
@@ -60,8 +60,8 @@ export function recoverEthAddress(message: string, signature: string): string | 
     if (recovery !== 0 && recovery !== 1) return null
 
     const digest = eip191Digest(message)
-    const sig = secp256k1.Signature.fromBytes(compact, 'compact').addRecoveryBit(recovery)
-    const publicKey = sig.recoverPublicKey(digest).toBytes(false)
+    const sig = secp256k1.Signature.fromCompact(compact).addRecoveryBit(recovery)
+    const publicKey = sig.recoverPublicKey(digest).toRawBytes(false)
     return addressFromPublicKey(publicKey)
   } catch {
     return null
