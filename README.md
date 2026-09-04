@@ -38,7 +38,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 | `shared/` | Pure domain logic: game economics, secret matching, session state, Solana encoding |
 | `programs/kwami-vault/` | The Anchor program — escrow, sessions, settlement |
 | `supabase/migrations/` | Schema, row level security, read models |
-| `tests/` | 185 Vitest tests over the domain and utility layers |
+| `tests/` | 241 Vitest tests over the domain and utility layers |
 | `docs/` | Full documentation, also served at `/docs` |
 
 ## The interesting parts
@@ -60,7 +60,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 ```bash
 bun run dev            # development server
 bun run build          # production build (Bun preset)
-bun run test           # 185 tests
+bun run test           # 241 tests
 bun run test:coverage  # with thresholds
 bun run typecheck      # vue-tsc over the project
 bun run lint           # ESLint
