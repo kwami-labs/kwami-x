@@ -53,7 +53,11 @@ export default defineEventHandler(async (event) => {
   if (!tx) throw createError({ statusCode: 404, statusMessage: 'Ticket transaction not found yet.' })
   if (tx.meta?.err) throw createError({ statusCode: 400, statusMessage: 'The ticket transaction failed.' })
 
-  const player = new PublicKey(tx.transaction.message.getAccountKeys().staticAccountKeys[0])
+  // The fee payer is always the first static account key, and for a ticket
+  // transaction that is the player.
+  const feePayer = tx.transaction.message.getAccountKeys().staticAccountKeys[0]
+  if (!feePayer) throw createError({ statusCode: 400, statusMessage: 'Malformed ticket transaction.' })
+  const player = new PublicKey(feePayer)
   const [sessionPda] = findSessionPda(
     new PublicKey(body.mint),
     player,

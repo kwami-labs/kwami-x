@@ -2,7 +2,6 @@ import { z } from 'zod'
 import bs58 from 'bs58'
 import { parseSiwsMessage, validateSiwsMessage } from '#shared/auth/siws'
 import { consumeNonce } from '~~/server/utils/nonce'
-import { serviceClient } from '~~/server/utils/supabase'
 import { verifySolanaSignature } from '~~/server/utils/solana'
 
 const Body = z.object({

@@ -53,8 +53,9 @@ export function recoverEthAddress(message: string, signature: string): string | 
     if (hex.length !== 130) return null
 
     const bytes = Buffer.from(hex, 'hex')
+    if (bytes.length !== 65) return null
     const compact = new Uint8Array(bytes.subarray(0, 64))
-    let recovery = bytes[64]
+    let recovery = bytes.readUInt8(64)
     if (recovery >= 27) recovery -= 27
     if (recovery !== 0 && recovery !== 1) return null
 
@@ -78,7 +79,8 @@ export function toChecksumAddress(address: string): string {
   const hash = Buffer.from(keccak_256(new TextEncoder().encode(lower))).toString('hex')
   let out = '0x'
   for (let i = 0; i < lower.length; i++) {
-    out += parseInt(hash[i], 16) >= 8 ? lower[i].toUpperCase() : lower[i]
+    const char = lower[i]!
+    out += parseInt(hash[i]!, 16) >= 8 ? char.toUpperCase() : char
   }
   return out
 }

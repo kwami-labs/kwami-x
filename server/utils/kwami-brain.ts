@@ -130,13 +130,13 @@ const DEFLECTIONS = [
   'I could tell you. I have decided not to.',
   'You are spending your minutes on the wrong shape of question.',
   'Mm. Try that again, but meaner.',
-]
+] as const
 
 const CLOSING = [
   'Not much time left for you.',
   'The clock does not care how close you are.',
   'Seconds now. Choose your words.',
-]
+] as const
 
 /**
  * The no-API-key Kwami.
@@ -168,6 +168,6 @@ export function respondScripted(input: BrainInput): string {
   return pick(DEFLECTIONS, input.history.length)
 }
 
-function pick<T>(list: T[], seed: number): T {
-  return list[Math.abs(seed) % list.length]
+function pick<T>(list: readonly [T, ...T[]], seed: number): T {
+  return list[Math.abs(seed) % list.length]!
 }
