@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { KwamiDetailResponse } from '#shared/types/api'
 const route = useRoute()
 const mint = computed(() => route.params.mint as string)
 
-const { data, error } = await useFetch(`/api/kwami/${mint.value}`)
+const { data, error } = await useFetch<KwamiDetailResponse>(`/api/kwami/${mint.value}`)
 const kwami = computed(() => data.value?.kwami)
 const wallet = useWalletStore()
 

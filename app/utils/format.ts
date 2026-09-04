@@ -25,8 +25,13 @@ export function formatUsdc(baseUnits: bigint | number, opts: { symbol?: boolean 
 export function formatUsd(usd: number): string {
   if (!Number.isFinite(usd)) return '—'
   if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`
+  // Past five figures the cents are noise next to the magnitude; below that
+  // they are the difference between two pots. Both get separators, because a
+  // grid showing "$1008.00" beside "$13,191" reads as two different formats.
   if (usd >= 10_000) return `$${Math.round(usd).toLocaleString('en-US')}`
-  if (usd >= 1) return `$${usd.toFixed(2)}`
+  if (usd >= 1) {
+    return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
   return `$${usd.toFixed(3)}`
 }
 

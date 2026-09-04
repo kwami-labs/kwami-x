@@ -37,7 +37,10 @@ export function createAudioMeter(stream: MediaStream): AudioMeter {
     level() {
       analyser.getFloatTimeDomainData(buffer)
       let sum = 0
-      for (let i = 0; i < buffer.length; i++) sum += buffer[i] * buffer[i]
+      for (let i = 0; i < buffer.length; i++) {
+        const sample = buffer[i]!
+        sum += sample * sample
+      }
       const rms = Math.sqrt(sum / buffer.length)
       // Speech RMS sits around 0.05–0.2. Scaling by 6 puts normal talking
       // near the middle of the range rather than pinned at the bottom.

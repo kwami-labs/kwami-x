@@ -19,7 +19,6 @@ import {
   PerspectiveCamera,
   Scene,
   ShaderMaterial,
-  Vector3,
   WebGLRenderer,
   AdditiveBlending,
   BufferGeometry,
@@ -212,21 +211,21 @@ export function mountKwami(canvas: HTMLCanvasElement, options: KwamiRendererOpti
   const camera = new PerspectiveCamera(45, 1, 0.1, 100)
   camera.position.set(0, 0, 4.2)
 
-  const material = new ShaderMaterial({
-    vertexShader: VERTEX,
-    fragmentShader: FRAGMENT,
-    uniforms: {
-      uTime: { value: 0 },
-      uAmplitude: { value: preset.amplitude },
-      uFrequency: { value: preset.frequency },
-      uAudio: { value: 0 },
-      uArousal: { value: 0 },
-      uVitality: { value: options.vitality ?? 1 },
-      uRimPower: { value: preset.rimPower },
-      uColorA: { value: new Color(options.colorA ?? '#7c5cff') },
-      uColorB: { value: new Color(options.colorB ?? '#3ddc97') },
-    },
-  })
+  // Uniform objects are captured by reference below, so the render loop mutates
+  // them directly instead of indexing `material.uniforms` sixty times a second.
+  const uniforms = {
+    uTime: { value: 0 },
+    uAmplitude: { value: preset.amplitude },
+    uFrequency: { value: preset.frequency },
+    uAudio: { value: 0 },
+    uArousal: { value: 0 },
+    uVitality: { value: options.vitality ?? 1 },
+    uRimPower: { value: preset.rimPower },
+    uColorA: { value: new Color(options.colorA ?? '#7c5cff') },
+    uColorB: { value: new Color(options.colorB ?? '#3ddc97') },
+  }
+
+  const material = new ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms })
 
   const mesh = new Mesh(new IcosahedronGeometry(1, preset.detail), material)
   scene.add(mesh)
@@ -288,9 +287,9 @@ export function mountKwami(canvas: HTMLCanvasElement, options: KwamiRendererOpti
     const rate = audioTarget > audioSmoothed ? 18 : 4
     audioSmoothed += (audioTarget - audioSmoothed) * Math.min(1, dt * rate)
 
-    material.uniforms.uTime.value = (now - clockStart) / 1000
-    material.uniforms.uAudio.value = audioSmoothed
-    material.uniforms.uArousal.value = arousal
+    uniforms.uTime.value = (now - clockStart) / 1000
+    uniforms.uAudio.value = audioSmoothed
+    uniforms.uArousal.value = arousal
 
     mesh.rotation.y += dt * preset.spin
     mesh.rotation.x = Math.sin((now - clockStart) / 6000) * 0.14
@@ -314,11 +313,11 @@ export function mountKwami(canvas: HTMLCanvasElement, options: KwamiRendererOpti
       arousal = Math.max(0, Math.min(1, value))
     },
     setVitality(value) {
-      material.uniforms.uVitality.value = Math.max(0, Math.min(1, value))
+      uniforms.uVitality.value = Math.max(0, Math.min(1, value))
     },
     setColors(a, b) {
-      material.uniforms.uColorA.value.set(a)
-      material.uniforms.uColorB.value.set(b)
+      uniforms.uColorA.value.set(a)
+      uniforms.uColorB.value.set(b)
     },
     resize,
     dispose() {

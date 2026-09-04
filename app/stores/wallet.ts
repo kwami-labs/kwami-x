@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
-import { Connection, LAMPORTS_PER_SOL, PublicKey, VersionedTransaction, type Transaction } from '@solana/web3.js'
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
+import type { Transaction, VersionedTransaction } from '@solana/web3.js'
 import {
   describeWalletError,
-  getPhantomProvider,
   isMobileBrowser,
   isUserRejection,
   phantomDeeplink,

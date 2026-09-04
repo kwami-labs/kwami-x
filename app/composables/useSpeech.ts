@@ -78,6 +78,7 @@ export function useSpeech(options: SpeechOptions) {
       let interimText = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
+        if (!result) continue
         const alternative = result[0]
         if (result.isFinal) {
           options.onFinal(alternative.transcript.trim(), alternative.confidence)

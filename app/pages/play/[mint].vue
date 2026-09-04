@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { KwamiDetailResponse } from '#shared/types/api'
 import { formatCountdown } from '#shared/game/session'
 import type { Asset } from '#shared/types/kwami'
 import { createAudioMeter, type AudioMeter } from '~/utils/audio-meter'
@@ -6,7 +7,7 @@ import { createAudioMeter, type AudioMeter } from '~/utils/audio-meter'
 const route = useRoute()
 const mint = computed(() => route.params.mint as string)
 
-const { data } = await useFetch(`/api/kwami/${mint.value}`)
+const { data } = await useFetch<KwamiDetailResponse>(`/api/kwami/${mint.value}`)
 const kwami = computed(() => data.value?.kwami ?? null)
 const demo = computed(() => data.value?.demo ?? false)
 

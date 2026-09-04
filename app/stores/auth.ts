@@ -46,7 +46,8 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
-  function fail(message: string) {
+  /** Record an error and abort. Returns `never`, so callers narrow correctly after it. */
+  function fail(message: string): never {
     error.value = message
     loading.value = false
     throw new Error(message)
@@ -159,7 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       const accounts = (await eth!.request({ method: 'eth_requestAccounts' })) as string[]
       const address = accounts[0]
-      if (!address) fail('MetaMask returned no account.')
+      if (!address) return fail('MetaMask returned no account.')
 
       const { nonce } = await $fetch<{ nonce: string }>('/api/auth/nonce', {
         method: 'POST',
