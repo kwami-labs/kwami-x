@@ -49,28 +49,6 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'bun',
     /**
-     * Force `bigint-buffer` onto its pure-JavaScript implementation.
-     *
-     * `@solana/spl-token` pulls it in transitively. Its Node build tries to
-     * load a native NAPI addon and falls back to JS on failure — but under Bun
-     * that load is a hard panic (`unsupported uv function: uv_version_string`),
-     * so the `catch` never runs and the server dies on boot rather than
-     * degrading. `dist/browser.js` is the byte-identical JS implementation
-     * minus the binding attempt. The native path is a micro-optimisation on
-     * buffer conversions; nothing here is hot enough to notice.
-     *
-     * Track: https://github.com/oven-sh/bun/issues/18546
-     */
-    alias: {
-      'bigint-buffer': 'bigint-buffer/dist/browser.js',
-    },
-    // The alias only applies to bundled code. By default Nitro externalises
-    // node_modules and copies them verbatim, which would ship the native build
-    // untouched — so this package is inlined to force it through the alias.
-    externals: {
-      inline: ['bigint-buffer', '@solana/buffer-layout-utils'],
-    },
-    /**
      * Bundle `docs/` into the server build.
      *
      * The docs route reads markdown at request time. Reading it from

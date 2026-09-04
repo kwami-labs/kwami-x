@@ -62,8 +62,5 @@
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "vue-tsc": "^3.1.4"
-  },
-  "overrides": {
-    "bigint-buffer": "file:./shims/bigint-buffer"
   }
 }

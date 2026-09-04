@@ -5,17 +5,6 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from '@solana/web3.js'
-import {
-  createAssociatedTokenAccountInstruction,
-  createInitializeMint2Instruction,
-  createMintToInstruction,
-  createSetAuthorityInstruction,
-  getAssociatedTokenAddressSync,
-  getMinimumBalanceForRentExemptMint,
-  AuthorityType,
-  MINT_SIZE,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token'
 import { createKwamiIx } from '#shared/solana/instructions'
 import type { KwamiRenderer, ResolutionMode } from '#shared/types/kwami'
 
@@ -47,6 +36,12 @@ export type MintPhase = 'idle' | 'committing' | 'building' | 'signing' | 'confir
  *
  * Phantom's `signAndSendTransaction` carries the whole bundle, so the user sees
  * one decoded prompt listing exactly what is being created.
+ *
+ * `@solana/spl-token` is imported dynamically rather than at module scope. The
+ * mint transaction is built and signed entirely in the browser, so the library
+ * has no business in the SSR bundle — and keeping it out matters beyond bundle
+ * size: it pulls in `bigint-buffer`, whose native addon hard-panics under Bun
+ * (oven-sh/bun#18546) rather than falling back to its own JavaScript path.
  */
 export function useMintKwami() {
   const wallet = useWalletStore()
@@ -87,6 +82,18 @@ export function useMintKwami() {
 
       // --- 2. Build the bundle.
       phase.value = 'building'
+      const {
+        createAssociatedTokenAccountInstruction,
+        createInitializeMint2Instruction,
+        createMintToInstruction,
+        createSetAuthorityInstruction,
+        getAssociatedTokenAddressSync,
+        getMinimumBalanceForRentExemptMint,
+        AuthorityType,
+        MINT_SIZE,
+        TOKEN_PROGRAM_ID,
+      } = await import('@solana/spl-token')
+
       const connection = wallet.rpc()
       const mintKeypair = Keypair.generate()
       const mint = mintKeypair.publicKey
