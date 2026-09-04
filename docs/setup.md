@@ -88,6 +88,10 @@ NUXT_MOONPAY_SECRET_KEY=sk_test_...
 
 A `pk_test_` key automatically routes to MoonPay's sandbox.
 
+## Known gotcha
+
+If you add a Solana library that is only needed in the browser, import it **dynamically at its point of use** rather than at module scope. `@solana/spl-token` pulls in `bigint-buffer`, whose native addon hard-panics under Bun instead of falling back to JavaScript, and a module-scope import puts it in the SSR graph where it will kill the production server on its first page render. See [Architecture](/docs/architecture#why-bun).
+
 ## Commands
 
 | Command | What it does |

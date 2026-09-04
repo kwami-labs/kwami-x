@@ -80,4 +80,14 @@ With no Supabase credentials, read routes serve a seeded dataset and every mutat
 
 ## Why Bun
 
-The Nitro `bun` preset, `bun install`, and Vitest under Bun. The practical win is install and cold-start time on a project that carries Solana's dependency tree; the practical cost is that a small number of Node-shaped packages need `vite.optimizeDeps` hints, which `nuxt.config.ts` provides.
+The Nitro `bun` preset, `bun install`, and Vitest under Bun. The practical win is install and cold-start time on a project that carries Solana's dependency tree.
+
+The practical cost is that a few Node-shaped packages need help. Two are worth knowing about:
+
+**`vite.optimizeDeps`** carries hints for `@solana/web3.js`, `bs58` and `tweetnacl`, which reach for Node globals Vite does not shim by default.
+
+**`@solana/spl-token` is imported dynamically, inside the mint function.** It depends transitively on `bigint-buffer`, whose Node build tries to load a native NAPI addon and falls back to JavaScript on failure — except that under Bun the load is a hard panic (`unsupported uv function: uv_version_string`), so the `catch` never runs and the server dies on its first page render. Neither bundler aliasing nor `nitro.externals.inline` fixes this, because Nitro externalises node_modules and copies the native build through untouched.
+
+The fix is not a workaround. The mint transaction is built and signed entirely in the browser, so SPL Token has no business in the SSR graph at all; a dynamic import inside `useMintKwami` keeps it out, which is both correct and smaller. Track: [oven-sh/bun#18546](https://github.com/oven-sh/bun/issues/18546).
+
+The general lesson holds for anything added later: **anything the browser alone needs should be imported dynamically at its point of use**, not at module scope in a file that SSR will evaluate.
