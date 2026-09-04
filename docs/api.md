@@ -69,6 +69,16 @@ The salt is generated server-side. A client-chosen salt would let a malicious au
 
 Step 2. Verifies the mint transaction against the cluster — that it succeeded, that it involves this mint, and that it called the Kwami program — before binding the draft to the mint address.
 
+### `GET /api/kwami/:mint/metadata`
+
+The NFT's off-chain metadata document, in Metaplex's standard schema. This is the URI written on chain at mint, so it is what Phantom, Magic Eden and Tensor read.
+
+`animation_url` points at `/embed/<mint>`, so what a wallet renders is the live 3D Kwami rather than a static file. Cached for 30 seconds — long enough to protect the database, short enough that the pot a marketplace shows is roughly current.
+
+### `GET /api/kwami/:mint/image.svg`
+
+The static thumbnail, generated per request. Draws the current pot and a vitality ring using the same mint-derived palette and square-root scale as the app. SVG because it has to say something current, and because every NFT client renders it without an image pipeline behind it.
+
 ## Sessions
 
 ### `POST /api/session/start` — auth

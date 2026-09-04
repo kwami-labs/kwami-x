@@ -38,7 +38,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 | `shared/` | Pure domain logic: game economics, secret matching, session state, Solana encoding |
 | `programs/kwami-vault/` | The Anchor program — escrow, sessions, settlement |
 | `supabase/migrations/` | Schema, row level security, read models |
-| `tests/` | 250 Vitest tests over the domain and utility layers |
+| `tests/` | 261 Vitest tests over the domain and utility layers |
 | `docs/` | Full documentation, also served at `/docs` |
 
 ## The interesting parts
@@ -53,14 +53,14 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 
 **An AI program builder with a real boundary.** A Kwami owner describes a financial game in plain language and gets an Anchor sub-program the vault calls at lifecycle moments. The extension has no authority over the vault PDA, so a bad one can break the owner's game but cannot drain it — which is what makes it safe to let a model write. → [docs/builder.md](docs/builder.md)
 
-**Embeddable anywhere.** Any Kwami drops onto any site as an iframe or a 2KB loader script, still connected to its live pot. → [docs/embed.md](docs/embed.md)
+**Embeddable anywhere — including wallets you never integrate with.** Any Kwami drops onto any site as an iframe or a 2KB loader script. Its NFT metadata also points `animation_url` at that embed, so Phantom, Magic Eden and Tensor render the *live* Kwami — real pot, real vitality — for free. The thumbnail is generated SVG for the same reason: a file pinned at mint would advertise a $0 pot forever. → [docs/embed.md](docs/embed.md)
 
 ## Commands
 
 ```bash
 bun run dev            # development server
 bun run build          # production build (Bun preset)
-bun run test           # 250 tests
+bun run test           # 261 tests
 bun run test:coverage  # with thresholds
 bun run typecheck      # vue-tsc over the project
 bun run lint           # ESLint
@@ -77,7 +77,7 @@ bun run db:push        # apply Supabase migrations
 
 ## Status
 
-The application, the domain layer and the documentation are complete and tested: 250 tests, 93% coverage of the logic layers, clean typecheck and lint, and a production build that serves every route.
+The application, the domain layer and the documentation are complete and tested: 261 tests, 93% coverage of the logic layers, clean typecheck and lint, and a production build that serves every route.
 
 Two things are deliberately not finished, and neither is hidden:
 

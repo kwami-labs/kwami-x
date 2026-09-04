@@ -57,6 +57,10 @@ window.addEventListener('message', (e) => {
 
 Always check `e.origin` before acting on a message. The embed does not currently accept inbound messages.
 
+## Wallets and marketplaces get it for free
+
+The embed is not only for sites that choose to add one. Every Kwami's NFT metadata sets `animation_url` to its embed URL, so Phantom, Magic Eden, Tensor and anything else that follows the Metaplex schema renders the **live** Kwami — current pot, current vitality — wherever the token appears. Nobody has to integrate anything.
+
 ## Using the renderer directly
 
 For a native app or a custom canvas, `app/utils/kwami-renderer.ts` is self-contained and depends only on Three.js:
