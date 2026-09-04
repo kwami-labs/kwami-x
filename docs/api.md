@@ -104,6 +104,17 @@ A win is the **only** circumstance under which claim material leaves the server.
 
 Asks the Kwami to answer. Runs server-side because the persona prompt contains the secret — the model needs it to steer *around* it.
 
+### `POST /api/session/:id/voice-token` — auth, player only
+
+Issues a LiveKit token scoped to this session's room, expiring in five minutes.
+
+```json
+← { "transport": "livekit", "url": "wss://…", "room": "kwami-…", "token": "…" }
+← { "transport": "browser" }   // when LiveKit is not configured
+```
+
+Reports `transport: "browser"` rather than failing when LiveKit is absent, so the client falls back to the Web Speech path instead of the session dying. The token never grants room admin — a player must not be able to evict the agent from the room they are trying to beat.
+
 ### `POST /api/session/:id/claimed` — auth, player only
 
 Bookkeeping. Records the settlement signature after verifying it succeeded. Nothing here authorises a payout; the money already moved.
