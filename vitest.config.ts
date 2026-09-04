@@ -13,6 +13,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '#shared': fileURLToPath(new URL('./shared', import.meta.url)),
+      // Nuxt's project-root alias. Server utils are imported through it, so the
+      // tests have to resolve it the same way the app does.
+      '~~': fileURLToPath(new URL('.', import.meta.url)),
       '~': fileURLToPath(new URL('./app', import.meta.url)),
       '@': fileURLToPath(new URL('./app', import.meta.url)),
     },
