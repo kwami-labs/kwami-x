@@ -1,0 +1,22 @@
+[package]
+name = "kwami-vault"
+version = "3.0.0"
+description = "Kwami v3 vault: ticketed voice challenges with on-chain pots, commit-reveal wins and pluggable game extensions."
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "kwami_vault"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = "0.31.1"
