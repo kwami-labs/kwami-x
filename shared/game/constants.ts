@@ -41,3 +41,12 @@ export const AUTHOR_ROYALTY_BPS_OF_FEE = 4_000
 
 /** Minimum ticket price, so the fee split never rounds to dust. */
 export const MIN_TICKET_USD = 0.5
+
+/**
+ * Royalty on secondary NFT sales, in basis points of the sale price.
+ *
+ * Set to the same 1% the author earns on every ticket, so the incentive to
+ * seed a Kwami well is identical whether it is played or flipped. Written into
+ * the Metaplex metadata at mint and therefore immutable.
+ */
+export const SECONDARY_ROYALTY_BPS = 100
