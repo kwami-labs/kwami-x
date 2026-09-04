@@ -29,6 +29,10 @@ Its rent-exempt minimum is excluded from every payout calculation — that lampo
 
 One challenge. `start_session_*` requires `nonce == kwami.sessions_played`, which means a player cannot hold two sessions against the same Kwami at once and cannot brute-force it in parallel.
 
+The seeds are derived at `init`, where the nonce is an instruction argument. On the **claim** path the session is validated by its contents instead — `session.kwami == kwami.key()` and `session.player == player.key()` — rather than by re-deriving its address from a nonce that lives inside the account being validated.
+
+That is sufficient. The account must be program-owned and deserialize as a `Session`; it must belong to this Kwami; and it must belong to the signer. The only substitution left is one of the caller's *own* sessions against the same Kwami, and the nonce rule allows only one of those to be open while `settle_win` refuses anything resolved or past its deadline.
+
 ### `Extension` — `["extension", mint]`
 
 An opt-in record binding a Kwami to an owner-authored sub-program. See [Program builder](/docs/builder).
@@ -107,6 +111,16 @@ That read-back is the whole security of the mechanism. Solana has no syscall to 
 The message binds three things: the session, the player and a deadline. Drop any one of them and a captured attestation becomes replayable against another session, by another wallet, or forever.
 
 The oracle can only witness. The program gives it no authority to move funds, so a compromise means forged wins on attested Kwamis — bad — rather than a drained treasury. That asymmetry is the reason the mode is offered at all.
+
+## Paying out of the vault
+
+The vault is a system-owned PDA carrying no data, which is what makes its lamport balance *be* the SOL pot with no parallel accounting to drift out of sync.
+
+The consequence is that the program cannot pay a winner by writing to it. Solana permits a program to modify the lamports only of accounts it **owns**, and the vault's owner is the System Program. So every payout — a win, or an owner withdrawal — is a CPI to `system_instruction::transfer`, with the vault PDA signing for itself via `invoke_signed`.
+
+This is why `ClaimWin` and `WithdrawSol` both require the System Program account. Omitting it makes every settlement fail.
+
+The rent-exempt minimum is excluded from the pot in `pot_lamports`. That floor was never anybody's winnings, and paying it out would delete the vault along with the Kwami's ability to ever hold anything again.
 
 ## Why the payout is proportional, not converted
 
