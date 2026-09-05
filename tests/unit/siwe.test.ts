@@ -37,9 +37,15 @@ describe('SIWE messages', () => {
 
   it('validates domain, nonce and freshness', () => {
     const now = new Date('2026-09-04T12:01:00.000Z')
-    expect(validateSiweMessage(BASE, { expectedDomain: 'x.kwami.io', expectedNonce: 'nonce-1', now }).valid).toBe(true)
-    expect(validateSiweMessage(BASE, { expectedDomain: 'evil.example', expectedNonce: 'nonce-1', now }).valid).toBe(false)
-    expect(validateSiweMessage(BASE, { expectedDomain: 'x.kwami.io', expectedNonce: 'other', now }).valid).toBe(false)
+    expect(
+      validateSiweMessage(BASE, { expectedDomain: 'x.kwami.io', expectedNonce: 'nonce-1', now }).valid,
+    ).toBe(true)
+    expect(
+      validateSiweMessage(BASE, { expectedDomain: 'evil.example', expectedNonce: 'nonce-1', now }).valid,
+    ).toBe(false)
+    expect(
+      validateSiweMessage(BASE, { expectedDomain: 'x.kwami.io', expectedNonce: 'other', now }).valid,
+    ).toBe(false)
     expect(
       validateSiweMessage(BASE, {
         expectedDomain: 'x.kwami.io',

@@ -29,14 +29,19 @@
 //! resolution mode and the extension program. What moves is the pot, the
 //! counters, the lifecycle state and — on a marketplace sale — the owner.
 
+// Anchor's `#[program]` macro expands to a call to the deprecated `AccountInfo::realloc`, and
+// `anchor_lang::solana_program::system_instruction` is deprecated in favour of a crate
+// anchor-lang 0.31 does not itself depend on yet. Neither is fixable from this source, and
+// `clippy -D warnings` is worth keeping as a real gate rather than softening it — so allow
+// exactly this lint, and nothing else. Revisit when anchor-lang moves off both.
+#![allow(deprecated)]
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_lang::solana_program::program::{invoke, invoke_signed};
 use anchor_lang::solana_program::system_instruction;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token_interface::{
-    self, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 pub mod attestation;
 pub mod errors;
@@ -59,12 +64,18 @@ pub mod kwami_vault {
 
     // ---------------------------------------------------------------- config
 
-    pub fn initialize_config(ctx: Context<InitializeConfig>, fee_bps: u16, oracle: Pubkey) -> Result<()> {
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
+        fee_bps: u16,
+        oracle: Pubkey,
+        usdc_mint: Pubkey,
+    ) -> Result<()> {
         require!(fee_bps <= MAX_FEE_BPS, KwamiError::FeeTooHigh);
         let config = &mut ctx.accounts.config;
         config.authority = ctx.accounts.authority.key();
         config.treasury = ctx.accounts.treasury.key();
         config.oracle = oracle;
+        config.usdc_mint = usdc_mint;
         config.fee_bps = fee_bps;
         config.paused = false;
         config.bump = ctx.bumps.config;
@@ -79,6 +90,7 @@ pub mod kwami_vault {
         oracle: Option<Pubkey>,
         paused: Option<bool>,
         treasury: Option<Pubkey>,
+        usdc_mint: Option<Pubkey>,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
         if let Some(bps) = fee_bps {
@@ -93,6 +105,9 @@ pub mod kwami_vault {
         }
         if let Some(t) = treasury {
             config.treasury = t;
+        }
+        if let Some(m) = usdc_mint {
+            config.usdc_mint = m;
         }
         Ok(())
     }
@@ -139,6 +154,7 @@ pub mod kwami_vault {
         kwami.state = KwamiState::Minted;
         kwami.high_water_mark_cents = 0;
         kwami.sessions_played = 0;
+        kwami.pot_locked_until = 0;
         kwami.sessions_won = 0;
         kwami.secret_revealed = false;
         kwami.extension = Pubkey::default();
@@ -204,7 +220,10 @@ pub mod kwami_vault {
 
         let kwami = &ctx.accounts.kwami;
         assert_playable(kwami)?;
-        require!(kwami.ticket_price_lamports > 0, KwamiError::AssetNotAccepted);
+        require!(
+            kwami.ticket_price_lamports > 0,
+            KwamiError::AssetNotAccepted
+        );
         require!(nonce == kwami.sessions_played, KwamiError::SessionActive);
 
         let ticket = kwami.ticket_price_lamports;
@@ -245,8 +264,14 @@ pub mod kwami_vault {
             ctx.bumps.session,
         );
 
+        let expires_at = ctx.accounts.session.expires_at;
         let kwami = &mut ctx.accounts.kwami;
-        kwami.sessions_played = kwami.sessions_played.checked_add(1).ok_or(KwamiError::MathOverflow)?;
+        kwami.sessions_played = kwami
+            .sessions_played
+            .checked_add(1)
+            .ok_or(KwamiError::MathOverflow)?;
+        // Hold the pot until this challenge can no longer be claimed.
+        kwami.lock_pot_until(expires_at);
 
         emit!(SessionStarted {
             mint: kwami.mint,
@@ -314,8 +339,14 @@ pub mod kwami_vault {
             ctx.bumps.session,
         );
 
+        let expires_at = ctx.accounts.session.expires_at;
         let kwami = &mut ctx.accounts.kwami;
-        kwami.sessions_played = kwami.sessions_played.checked_add(1).ok_or(KwamiError::MathOverflow)?;
+        kwami.sessions_played = kwami
+            .sessions_played
+            .checked_add(1)
+            .ok_or(KwamiError::MathOverflow)?;
+        // Hold the pot until this challenge can no longer be claimed.
+        kwami.lock_pot_until(expires_at);
 
         emit!(SessionStarted {
             mint: kwami.mint,
@@ -333,14 +364,20 @@ pub mod kwami_vault {
     /// Pays `payout_bps` of *both* vault assets, so the winner's share does not
     /// depend on a price feed and settlement needs no swap route.
     pub fn claim_win_reveal(ctx: Context<ClaimWin>, preimage: Vec<u8>) -> Result<()> {
-        require!(preimage.len() <= MAX_PREIMAGE_LEN, KwamiError::PreimageTooLong);
+        require!(
+            preimage.len() <= MAX_PREIMAGE_LEN,
+            KwamiError::PreimageTooLong
+        );
         require!(
             ctx.accounts.kwami.resolution_mode == ResolutionMode::CommitReveal,
             KwamiError::WrongResolutionMode
         );
 
         let digest = hash(&preimage).to_bytes();
-        require!(digest == ctx.accounts.kwami.secret_hash, KwamiError::WrongSecret);
+        require!(
+            digest == ctx.accounts.kwami.secret_hash,
+            KwamiError::WrongSecret
+        );
 
         let now = Clock::get()?.unix_timestamp;
         let usdc = ctx.accounts.usdc_leg();
@@ -412,7 +449,10 @@ pub mod kwami_vault {
     pub fn settle_session(ctx: Context<SettleSession>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let session = &mut ctx.accounts.session;
-        require!(session.outcome == SessionOutcome::Pending, KwamiError::SessionResolved);
+        require!(
+            session.outcome == SessionOutcome::Pending,
+            KwamiError::SessionResolved
+        );
         require!(now >= session.expires_at, KwamiError::SessionActive);
         session.outcome = SessionOutcome::Expired;
         emit!(SessionExpired {
@@ -442,7 +482,10 @@ pub mod kwami_vault {
         }
 
         let funded = kwami.high_water_mark_cents > 0;
-        if funded && (is_dust_dead(value_cents) || is_drawdown_dead(value_cents, kwami.high_water_mark_cents)) {
+        if funded
+            && (is_dust_dead(value_cents)
+                || is_drawdown_dead(value_cents, kwami.high_water_mark_cents))
+        {
             kwami.state = KwamiState::Dead;
             emit!(KwamiDied {
                 mint: kwami.mint,
@@ -462,14 +505,27 @@ pub mod kwami_vault {
     /// ticket a scam.
     pub fn withdraw_sol(ctx: Context<WithdrawSol>, amount: u64) -> Result<()> {
         let kwami = &ctx.accounts.kwami;
+        let now = Clock::get()?.unix_timestamp;
         require!(
-            matches!(kwami.state, KwamiState::Minted | KwamiState::Paused | KwamiState::Dead | KwamiState::Cracked),
+            matches!(
+                kwami.state,
+                KwamiState::Minted | KwamiState::Paused | KwamiState::Dead | KwamiState::Cracked
+            ),
             KwamiError::WithdrawNotAllowed
         );
+        require!(now >= kwami.pot_locked_until, KwamiError::PotLocked);
+        debug_assert!(kwami.may_withdraw(now));
 
         let vault = ctx.accounts.vault.to_account_info();
-        require!(amount <= pot_lamports(&vault)?, KwamiError::InsufficientVault);
+        require!(
+            amount <= pot_lamports(&vault)?,
+            KwamiError::InsufficientVault
+        );
 
+        // The signer proved current ownership above; keep the cached field honest.
+        ctx.accounts.kwami.owner = ctx.accounts.owner.key();
+
+        let kwami = &ctx.accounts.kwami;
         pay_from_vault(
             &vault,
             &ctx.accounts.owner.to_account_info(),
@@ -483,14 +539,29 @@ pub mod kwami_vault {
     /// Owner withdraws USDC from the vault, under the same lifecycle rule.
     pub fn withdraw_usdc(ctx: Context<WithdrawUsdc>, amount: u64) -> Result<()> {
         let kwami = &ctx.accounts.kwami;
+        let now = Clock::get()?.unix_timestamp;
         require!(
-            matches!(kwami.state, KwamiState::Minted | KwamiState::Paused | KwamiState::Dead | KwamiState::Cracked),
+            matches!(
+                kwami.state,
+                KwamiState::Minted | KwamiState::Paused | KwamiState::Dead | KwamiState::Cracked
+            ),
             KwamiError::WithdrawNotAllowed
         );
-        require!(ctx.accounts.vault_usdc.amount >= amount, KwamiError::InsufficientVault);
+        require!(now >= kwami.pot_locked_until, KwamiError::PotLocked);
+        debug_assert!(kwami.may_withdraw(now));
+        require!(
+            ctx.accounts.vault_usdc.amount >= amount,
+            KwamiError::InsufficientVault
+        );
 
+        // Copy what the CPI needs before releasing the immutable borrow.
         let mint_key = kwami.mint;
-        let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &[kwami.vault_bump]];
+        let vault_bump = kwami.vault_bump;
+
+        // The signer proved current ownership above; keep the cached field honest.
+        ctx.accounts.kwami.owner = ctx.accounts.owner.key();
+
+        let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &[vault_bump]];
         token_interface::transfer_checked(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -514,10 +585,20 @@ pub mod kwami_vault {
     /// Only before the Kwami first goes live, and only once. A challenger who
     /// reads the rules before paying is guaranteed those are the rules that
     /// will settle their session.
-    pub fn register_extension(ctx: Context<RegisterExtension>, code_hash: [u8; 32], hooks: u8) -> Result<()> {
+    pub fn register_extension(
+        ctx: Context<RegisterExtension>,
+        code_hash: [u8; 32],
+        hooks: u8,
+    ) -> Result<()> {
         let kwami = &mut ctx.accounts.kwami;
-        require!(kwami.state == KwamiState::Minted, KwamiError::ExtensionLocked);
-        require!(kwami.extension == Pubkey::default(), KwamiError::ExtensionAlreadyRegistered);
+        require!(
+            kwami.state == KwamiState::Minted,
+            KwamiError::ExtensionLocked
+        );
+        require!(
+            kwami.extension == Pubkey::default(),
+            KwamiError::ExtensionAlreadyRegistered
+        );
 
         let ext = &mut ctx.accounts.extension;
         ext.kwami = kwami.key();
@@ -695,7 +776,10 @@ fn settle_win<'info>(
     usdc: Option<UsdcLeg<'info>>,
     now: i64,
 ) -> Result<()> {
-    require!(session.outcome == SessionOutcome::Pending, KwamiError::SessionResolved);
+    require!(
+        session.outcome == SessionOutcome::Pending,
+        KwamiError::SessionResolved
+    );
     require!(now < session.expires_at, KwamiError::SessionExpired);
 
     let payout_bps = kwami.payout_bps;
@@ -704,7 +788,14 @@ fn settle_win<'info>(
 
     // --- SOL leg.
     let payout_lamports = apply_bps(pot_lamports(vault)?, payout_bps)?;
-    pay_from_vault(vault, player, system_program, &mint_key, vault_bump, payout_lamports)?;
+    pay_from_vault(
+        vault,
+        player,
+        system_program,
+        &mint_key,
+        vault_bump,
+        payout_lamports,
+    )?;
 
     // --- USDC leg.
     let mut payout_usdc = 0u64;
@@ -733,7 +824,10 @@ fn settle_win<'info>(
     session.outcome = SessionOutcome::Won;
     session.payout_lamports = payout_lamports;
     session.payout_usdc = payout_usdc;
-    kwami.sessions_won = kwami.sessions_won.checked_add(1).ok_or(KwamiError::MathOverflow)?;
+    kwami.sessions_won = kwami
+        .sessions_won
+        .checked_add(1)
+        .ok_or(KwamiError::MathOverflow)?;
 
     emit!(SessionWon {
         mint: mint_key,
@@ -867,6 +961,10 @@ pub struct StartSessionUsdc<'info> {
     #[account(mut)]
     pub player: Signer<'info>,
 
+    /// Pinned to the protocol's stablecoin. Unconstrained, this accepted any SPL or
+    /// Token-2022 mint, so a token the player printed themselves bought a real session whose
+    /// win pays out real SOL.
+    #[account(address = config.usdc_mint @ KwamiError::AssetNotAccepted)]
     pub usdc_mint: InterfaceAccount<'info, Mint>,
     #[account(mut, token::mint = usdc_mint, token::authority = player)]
     pub player_usdc: InterfaceAccount<'info, TokenAccount>,
@@ -877,9 +975,11 @@ pub struct StartSessionUsdc<'info> {
         associated_token::authority = vault
     )]
     pub vault_usdc: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut, token::mint = usdc_mint)]
+    /// The fee and the royalty were constrained only by mint, so a player could pass their own
+    /// token accounts here and take both legs of their ticket straight back.
+    #[account(mut, token::mint = usdc_mint, token::authority = config.treasury)]
     pub treasury_usdc: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut, token::mint = usdc_mint)]
+    #[account(mut, token::mint = usdc_mint, token::authority = kwami.author)]
     pub author_usdc: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
@@ -996,12 +1096,23 @@ pub struct RecordValuation<'info> {
 
 #[derive(Accounts)]
 pub struct WithdrawSol<'info> {
-    #[account(
-        seeds = [b"kwami", kwami.mint.as_ref()],
-        bump = kwami.bump,
-        constraint = kwami.owner == owner.key() @ KwamiError::NotOwner
-    )]
+    #[account(mut, seeds = [b"kwami", kwami.mint.as_ref()], bump = kwami.bump)]
     pub kwami: Account<'info, Kwami>,
+    /// Proof that the signer holds the NFT *now*.
+    ///
+    /// Authorisation used to be `kwami.owner == owner.key()`, and `kwami.owner` is a cached
+    /// field that only the permissionless `sync_owner` refreshes — which nothing in the
+    /// application ever called. A seller therefore kept the right to drain the pot after the
+    /// sale, and a buyer who had not synced could not withdraw at all. Reading the token
+    /// account makes the check current by construction, and the handler writes the cached
+    /// field back so the rest of the program converges on the truth.
+    #[account(
+        constraint = nft_token.mint == kwami.mint @ KwamiError::NotNftHolder,
+        constraint = nft_token.owner == owner.key() @ KwamiError::NotNftHolder,
+        constraint = nft_token.amount == 1 @ KwamiError::NotNftHolder
+    )]
+    pub nft_token: InterfaceAccount<'info, TokenAccount>,
+
     /// CHECK: PDA validated by seeds.
     #[account(mut, seeds = [b"vault", kwami.mint.as_ref()], bump = kwami.vault_bump)]
     pub vault: UncheckedAccount<'info>,
@@ -1014,12 +1125,23 @@ pub struct WithdrawSol<'info> {
 
 #[derive(Accounts)]
 pub struct WithdrawUsdc<'info> {
-    #[account(
-        seeds = [b"kwami", kwami.mint.as_ref()],
-        bump = kwami.bump,
-        constraint = kwami.owner == owner.key() @ KwamiError::NotOwner
-    )]
+    #[account(mut, seeds = [b"kwami", kwami.mint.as_ref()], bump = kwami.bump)]
     pub kwami: Account<'info, Kwami>,
+    /// Proof that the signer holds the NFT *now*.
+    ///
+    /// Authorisation used to be `kwami.owner == owner.key()`, and `kwami.owner` is a cached
+    /// field that only the permissionless `sync_owner` refreshes — which nothing in the
+    /// application ever called. A seller therefore kept the right to drain the pot after the
+    /// sale, and a buyer who had not synced could not withdraw at all. Reading the token
+    /// account makes the check current by construction, and the handler writes the cached
+    /// field back so the rest of the program converges on the truth.
+    #[account(
+        constraint = nft_token.mint == kwami.mint @ KwamiError::NotNftHolder,
+        constraint = nft_token.owner == owner.key() @ KwamiError::NotNftHolder,
+        constraint = nft_token.amount == 1 @ KwamiError::NotNftHolder
+    )]
+    pub nft_token: InterfaceAccount<'info, TokenAccount>,
+
     /// CHECK: PDA validated by seeds; authority over `vault_usdc`.
     #[account(seeds = [b"vault", kwami.mint.as_ref()], bump = kwami.vault_bump)]
     pub vault: UncheckedAccount<'info>,

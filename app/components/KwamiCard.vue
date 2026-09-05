@@ -34,11 +34,16 @@ const ticket = computed(() => {
 
 const stateLabel = computed(() => {
   switch (props.kwami.state) {
-    case 'live': return 'Live'
-    case 'paused': return 'Paused'
-    case 'cracked': return 'Cracked'
-    case 'dead': return 'Dead'
-    default: return 'Minted'
+    case 'live':
+      return 'Live'
+    case 'paused':
+      return 'Paused'
+    case 'cracked':
+      return 'Cracked'
+    case 'dead':
+      return 'Dead'
+    default:
+      return 'Minted'
   }
 })
 </script>
@@ -99,12 +104,19 @@ const stateLabel = computed(() => {
   height: 156px;
   border-radius: var(--radius);
   overflow: hidden;
-  background: radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.05), transparent 70%), var(--bg-sunken);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.05), transparent 70%), var(--bg-sunken);
 }
 
-.kcard__state { position: absolute; top: 9px; right: 9px; }
+.kcard__state {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+}
 
-.kcard__name { font-size: 1.05rem; }
+.kcard__name {
+  font-size: 1.05rem;
+}
 
 .kcard__tag {
   font-size: 0.87rem;
@@ -124,8 +136,13 @@ const stateLabel = computed(() => {
   gap: 12px;
 }
 
-.kcard__ticket { align-items: flex-end; text-align: right; }
-.kcard__ticket .num { font-size: 0.88rem; }
+.kcard__ticket {
+  align-items: flex-end;
+  text-align: right;
+}
+.kcard__ticket .num {
+  font-size: 0.88rem;
+}
 
 .kcard__foot {
   display: flex;

@@ -42,6 +42,10 @@ async function act(action: 'publish' | 'pause') {
     const sig = await wallet.signAndSend(tx)
     await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed')
     signature.value = sig
+    // The chain is now authoritative; tell the index to catch up. Without this the Kwami is
+    // Live on chain and still `minted` in the database, so the arena never lists it and every
+    // ticket is refused — publishing appeared to work and changed nothing.
+    await $fetch(`/api/kwami/${kwami.value.mint}/sync`, { method: 'POST' })
     await refresh()
   } catch (e) {
     error.value = describeWalletError(e)
@@ -70,8 +74,8 @@ async function act(action: 'publish' | 'pause') {
         </div>
 
         <p class="muted">
-          Publishing opens it to challengers. Pausing stops new tickets — sessions already running still settle
-          normally, and the pot is untouched either way.
+          Publishing opens it to challengers. Pausing stops new tickets — sessions already running still
+          settle normally, and the pot is untouched either way.
         </p>
 
         <div class="row gap-2">
@@ -90,17 +94,18 @@ async function act(action: 'publish' | 'pause') {
       <div class="card stack gap-2">
         <h3>What you cannot change</h3>
         <p class="muted">
-          The secret, both ticket prices, the session length, the payout split and the resolution mode were written to
-          the chain at mint and have no setter. That is the point — a challenger who reads the rules before paying is
-          guaranteed those are the rules that settle their session.
+          The secret, both ticket prices, the session length, the payout split and the resolution mode were
+          written to the chain at mint and have no setter. That is the point — a challenger who reads the
+          rules before paying is guaranteed those are the rules that settle their session.
         </p>
       </div>
 
       <div class="card stack gap-2">
         <h3>Withdrawing</h3>
         <p class="muted">
-          The pot can only be withdrawn while the Kwami is unpublished, paused, cracked or dead. A live Kwami's pot
-          belongs to the game — letting an owner drain it mid-session would make every ticket a scam.
+          The pot can only be withdrawn while the Kwami is unpublished, paused, cracked or dead. A live
+          Kwami's pot belongs to the game — letting an owner drain it mid-session would make every ticket a
+          scam.
         </p>
       </div>
     </template>
@@ -108,5 +113,10 @@ async function act(action: 'publish' | 'pause') {
 </template>
 
 <style scoped>
-.manage { display: flex; flex-direction: column; gap: 20px; max-width: 620px; }
+.manage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 620px;
+}
 </style>

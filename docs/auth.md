@@ -2,14 +2,14 @@
 
 Six ways in. All six produce the same `auth.users` row shape, so nothing downstream has to care which door someone came through.
 
-| Method | Provider | Can hold a Kwami? |
-|---|---|---|
-| Email + password | Supabase | Only with a Solana wallet bound |
-| Phone (SMS OTP) | Supabase | Only with a Solana wallet bound |
-| Google | Supabase OAuth | Only with a Solana wallet bound |
-| GitHub | Supabase OAuth | Only with a Solana wallet bound |
-| **Phantom** | Custom (SIWS) | **Yes** |
-| MetaMask | Custom (SIWE) | No — identity only |
+| Method           | Provider       | Can hold a Kwami?               |
+| ---------------- | -------------- | ------------------------------- |
+| Email + password | Supabase       | Only with a Solana wallet bound |
+| Phone (SMS OTP)  | Supabase       | Only with a Solana wallet bound |
+| Google           | Supabase OAuth | Only with a Solana wallet bound |
+| GitHub           | Supabase OAuth | Only with a Solana wallet bound |
+| **Phantom**      | Custom (SIWS)  | **Yes**                         |
+| MetaMask         | Custom (SIWE)  | No — identity only              |
 
 ## Wallet sign-in
 
@@ -28,7 +28,7 @@ The nonce is single-use and stored in Nitro's storage layer rather than a module
 In `verify-solana.post.ts` the order is deliberate:
 
 1. Parse the message. Malformed input is rejected before anything expensive.
-2. Confirm the address in the *signed message* matches the claimed one. Trusting the request body here would let a caller claim someone else's signature belongs to their wallet.
+2. Confirm the address in the _signed message_ matches the claimed one. Trusting the request body here would let a caller claim someone else's signature belongs to their wallet.
 3. Consume the nonce — **before** verifying the signature, so a burst of retries with one nonce cannot be used to grind at it.
 4. Validate domain, version, timestamps.
 5. Only now, verify the signature.
@@ -43,7 +43,7 @@ The domain check is the one that stops replay: the wallet showed the user a spec
 2. On first sight, create an auth user with a synthetic, non-routable email (`solana-<addr>@wallet.kwami.invalid`).
 3. Generate a magic link with the admin API and immediately redeem it server-side with `verifyOtp`.
 
-The link is never emailed. This is the supported way to issue a session for an identity the application has already authenticated itself, and the payoff is that a wallet user is an *ordinary* Supabase user — same JWT, same RLS policies, and the option to later attach an email or a Google account to the same row rather than maintaining a parallel identity system forever.
+The link is never emailed. This is the supported way to issue a session for an identity the application has already authenticated itself, and the payoff is that a wallet user is an _ordinary_ Supabase user — same JWT, same RLS policies, and the option to later attach an email or a Google account to the same row rather than maintaining a parallel identity system forever.
 
 ## Phantom {#phantom}
 
@@ -59,7 +59,7 @@ There is a `signMessage` fallback for wallets that do not implement SIWS. It con
 
 ### Mobile
 
-Mobile browsers cannot host the extension. `phantomDeeplink()` builds a universal link that reopens the current page inside Phantom's in-app browser, where the provider *is* injected.
+Mobile browsers cannot host the extension. `phantomDeeplink()` builds a universal link that reopens the current page inside Phantom's in-app browser, where the provider _is_ injected.
 
 ### Detection
 

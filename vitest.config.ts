@@ -66,7 +66,15 @@ export default defineConfig({
         'app/utils/kwami-renderer.ts',
         'app/utils/audio-meter.ts',
       ],
-      thresholds: { lines: 80, functions: 80, branches: 75, statements: 80 },
+      /**
+       * A RATCHET, not a target. Measured 2026-09-05: 93.4 / 94.8 / 94.11 / 93.4, so the
+       * floor sits a couple of points under each — v8 drifts slightly run to run, and newly
+       * added source dilutes the ratio until its tests land.
+       *
+       * Raise it after a clean `bun run test:coverage`. Never lower it to make a red build
+       * pass; that is the one move that turns a ratchet back into a suggestion.
+       */
+      thresholds: { lines: 90, functions: 91, branches: 91, statements: 90 },
     },
   },
 })

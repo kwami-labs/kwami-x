@@ -42,7 +42,9 @@ export interface DemoKwami {
 
 const SOL_USD = 150
 
-function build(partial: Partial<DemoKwami> & Pick<DemoKwami, 'mint' | 'name' | 'tagline' | 'renderer'>): DemoKwami {
+function build(
+  partial: Partial<DemoKwami> & Pick<DemoKwami, 'mint' | 'name' | 'tagline' | 'renderer'>,
+): DemoKwami {
   const lamports = partial.balance_lamports ?? 0
   const usdc = partial.balance_usdc ?? 0
   const cents = Math.round(((lamports / 1e9) * SOL_USD + usdc / 1e6) * 100)

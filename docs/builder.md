@@ -14,12 +14,12 @@ That boundary is what makes it safe to let a language model write one. A bad ext
 
 ## Hooks
 
-| Hook | When |
-|---|---|
+| Hook             | When                                                  |
+| ---------------- | ----------------------------------------------------- |
 | `onSessionStart` | After a ticket is paid and the session account exists |
-| `onWin` | After a payout settles — receives the amounts paid |
-| `onExpire` | When a session is settled unwon |
-| `onDeath` | Once, when a Kwami crosses a death threshold |
+| `onWin`          | After a payout settles — receives the amounts paid    |
+| `onExpire`       | When a session is settled unwon                       |
+| `onDeath`        | Once, when a Kwami crosses a death threshold          |
 
 Selected hooks are stored as a bitmask on the `Extension` account.
 

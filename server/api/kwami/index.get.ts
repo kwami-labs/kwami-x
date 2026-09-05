@@ -30,7 +30,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = serviceClient()
-  let query = db.from('kwamis_public').select('*').range(q.offset, q.offset + q.limit - 1)
+  let query = db
+    .from('kwamis_public')
+    .select('*')
+    .range(q.offset, q.offset + q.limit - 1)
 
   if (q.state !== 'all') query = query.eq('state', q.state)
   if (q.owner) query = query.eq('owner_wallet', q.owner)

@@ -104,14 +104,14 @@ If you add a Solana library that is only needed in the browser, import it **dyna
 
 ## Commands
 
-| Command | What it does |
-|---------|-------------|
-| `bun run dev` | Development server on :3000 |
-| `bun run build` | Production build (Bun preset) |
-| `bun run test` | Full Vitest suite |
-| `bun run test:watch` | Watch mode |
-| `bun run test:coverage` | Coverage, with thresholds |
-| `bun run typecheck` | `vue-tsc` over the whole project |
-| `bun run lint` | ESLint |
-| `bun run anchor:build` | Build the Solana program |
-| `bun run db:push` | Apply migrations |
+| Command                 | What it does                     |
+| ----------------------- | -------------------------------- |
+| `bun run dev`           | Development server on :3000      |
+| `bun run build`         | Production build (Bun preset)    |
+| `bun run test`          | Full Vitest suite                |
+| `bun run test:watch`    | Watch mode                       |
+| `bun run test:coverage` | Coverage, with thresholds        |
+| `bun run typecheck`     | `vue-tsc` over the whole project |
+| `bun run lint`          | ESLint                           |
+| `bun run anchor:build`  | Build the Solana program         |
+| `bun run db:push`       | Apply migrations                 |

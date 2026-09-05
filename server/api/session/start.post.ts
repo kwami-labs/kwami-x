@@ -4,6 +4,7 @@ import { assertNotDemo } from '~~/server/utils/demo'
 import { requireUser, serviceClient } from '~~/server/utils/supabase'
 import { connection, isValidAddress } from '~~/server/utils/solana'
 import { findSessionPda } from '#shared/solana/pda'
+import { decodeSessionAccount } from '#shared/solana/accounts'
 import { clampDuration } from '#shared/game/session'
 
 const Body = z.object({
@@ -67,16 +68,39 @@ export default defineEventHandler(async (event) => {
 
   const keys = tx.transaction.message.getAccountKeys().staticAccountKeys.map((k) => k.toBase58())
   if (!keys.includes(sessionPda.toBase58())) {
-    // Without this the caller could point at any successful transaction and
-    // claim it bought this particular session.
     throw createError({ statusCode: 400, statusMessage: 'That transaction did not open this session.' })
   }
 
-  const startedAt = (tx.blockTime ?? Math.floor(Date.now() / 1000)) * 1000
-  const duration = clampDuration(kwami.session_duration)
+  // Listing the PDA is not proof of payment — any transaction can name a read-only account
+  // without calling anything. The Session ACCOUNT is the proof: the program creates it only
+  // inside start_session_sol/start_session_usdc, after the transfers have gone through. Read it
+  // and believe it over both the client and the index.
+  const programId = new PublicKey(config.public.kwamiProgramId as string)
+  const sessionInfo = await connection().getAccountInfo(sessionPda, 'confirmed')
+  if (!sessionInfo) {
+    throw createError({ statusCode: 402, statusMessage: 'No ticket was paid for this session.' })
+  }
+  if (!sessionInfo.owner.equals(programId)) {
+    throw createError({ statusCode: 402, statusMessage: "That session account is not the Kwami program's." })
+  }
 
-  const ticketAmount =
-    body.asset === 'SOL' ? BigInt(kwami.ticket_price_lamports) : BigInt(kwami.ticket_price_usdc)
+  const onChain = decodeSessionAccount(new Uint8Array(sessionInfo.data))
+  if (onChain.player !== player.toBase58() || onChain.nonce !== BigInt(body.nonce)) {
+    throw createError({ statusCode: 403, statusMessage: 'That ticket belongs to a different challenge.' })
+  }
+  if (onChain.kwami !== body.mint) {
+    throw createError({ statusCode: 400, statusMessage: 'That ticket is for a different Kwami.' })
+  }
+  if (onChain.outcome !== 'pending') {
+    throw createError({ statusCode: 409, statusMessage: 'That challenge has already been settled.' })
+  }
+
+  // Window and price come from the chain too. The asset used to be whatever the client
+  // declared and the amount was read back out of the index, so both could be falsified.
+  const startedAt = Number(onChain.startedAt) * 1000
+  const duration = clampDuration(kwami.session_duration)
+  const asset = onChain.asset
+  const ticketAmount = onChain.ticketAmount
 
   const { data: session, error: insertError } = await db
     .from('game_sessions')
@@ -87,10 +111,10 @@ export default defineEventHandler(async (event) => {
       player_wallet: player.toBase58(),
       account: sessionPda.toBase58(),
       nonce: body.nonce,
-      asset: body.asset,
+      asset,
       ticket_amount: ticketAmount.toString(),
       started_at: new Date(startedAt).toISOString(),
-      expires_at: new Date(startedAt + duration * 1000).toISOString(),
+      expires_at: new Date(Number(onChain.expiresAt) * 1000).toISOString(),
       outcome: 'pending',
       room: `kwami-${kwami.mint.slice(0, 12)}-${body.nonce}`,
       tx_start: body.signature,

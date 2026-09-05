@@ -16,6 +16,18 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+# Declared so Anchor's generated code does not trip `unexpected_cfgs`. Anchor's macros emit
+# `cfg(feature = "...")` for all three; without them clippy reports 19 warnings that belong to
+# the framework, not to this program, and drowns the ones that do.
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[lints.rust]
+# `target_os = "solana"` only exists on the SBF target, so a host-side `cargo check`, `clippy`
+# or `cargo test` does not know the value. Telling rustc it is expected keeps `-D warnings`
+# usable as a real gate instead of a wall of framework noise.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
 
 [dependencies]
 anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }

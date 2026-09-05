@@ -29,7 +29,9 @@ async function onEmail() {
       await auth.signInWithEmail(email.value, password.value)
       await done()
     }
-  } catch { /* surfaced through auth.error */ }
+  } catch {
+    /* surfaced through auth.error */
+  }
 }
 
 async function onPhone() {
@@ -43,7 +45,9 @@ async function onPhone() {
       await auth.verifyPhone(phone.value, otp.value)
       await done()
     }
-  } catch { /* surfaced through auth.error */ }
+  } catch {
+    /* surfaced through auth.error */
+  }
 }
 
 async function onWallet(kind: 'phantom' | 'metamask') {
@@ -51,7 +55,9 @@ async function onWallet(kind: 'phantom' | 'metamask') {
     if (kind === 'phantom') await auth.signInWithPhantom()
     else await auth.signInWithMetaMask()
     await done()
-  } catch { /* surfaced through auth.error */ }
+  } catch {
+    /* surfaced through auth.error */
+  }
 }
 </script>
 
@@ -65,7 +71,9 @@ async function onWallet(kind: 'phantom' | 'metamask') {
       </header>
 
       <div class="row gap-1 tabs">
-        <button class="chip" :class="{ 'chip--on': mode === 'wallet' }" @click="mode = 'wallet'">Wallet</button>
+        <button class="chip" :class="{ 'chip--on': mode === 'wallet' }" @click="mode = 'wallet'">
+          Wallet
+        </button>
         <button class="chip" :class="{ 'chip--on': mode === 'email' }" @click="mode = 'email'">Email</button>
         <button class="chip" :class="{ 'chip--on': mode === 'phone' }" @click="mode = 'phone'">Phone</button>
       </div>
@@ -79,8 +87,8 @@ async function onWallet(kind: 'phantom' | 'metamask') {
           Continue with MetaMask
         </button>
         <p class="hint">
-          Phantom is a full account — it can hold Kwamis and receive payouts. MetaMask signs you in but cannot hold a
-          Kwami; pots settle on Solana.
+          Phantom is a full account — it can hold Kwamis and receive payouts. MetaMask signs you in but cannot
+          hold a Kwami; pots settle on Solana.
         </p>
       </div>
 
@@ -88,7 +96,7 @@ async function onWallet(kind: 'phantom' | 'metamask') {
       <form v-else-if="mode === 'email'" class="stack gap-2" @submit.prevent="onEmail">
         <div class="field">
           <label class="label" for="email">Email</label>
-          <input id="email" v-model="email" class="input" type="email" autocomplete="email" required >
+          <input id="email" v-model="email" class="input" type="email" autocomplete="email" required />
         </div>
         <div class="field">
           <label class="label" for="password">Password</label>
@@ -100,7 +108,7 @@ async function onWallet(kind: 'phantom' | 'metamask') {
             :autocomplete="signUp ? 'new-password' : 'current-password'"
             required
             minlength="8"
-          >
+          />
         </div>
         <button class="btn btn--primary btn--block" type="submit" :disabled="auth.loading">
           {{ signUp ? 'Create account' : 'Sign in' }}
@@ -114,18 +122,33 @@ async function onWallet(kind: 'phantom' | 'metamask') {
       <form v-else class="stack gap-2" @submit.prevent="onPhone">
         <div class="field">
           <label class="label" for="phone">Phone</label>
-          <input id="phone" v-model="phone" class="input" type="tel" placeholder="+34600000000" autocomplete="tel" required >
+          <input
+            id="phone"
+            v-model="phone"
+            class="input"
+            type="tel"
+            placeholder="+34600000000"
+            autocomplete="tel"
+            required
+          />
         </div>
         <div v-if="otpSent" class="field">
           <label class="label" for="otp">Code</label>
-          <input id="otp" v-model="otp" class="input input--mono" inputmode="numeric" maxlength="8" required >
+          <input
+            id="otp"
+            v-model="otp"
+            class="input input--mono"
+            inputmode="numeric"
+            maxlength="8"
+            required
+          />
         </div>
         <button class="btn btn--primary btn--block" type="submit" :disabled="auth.loading">
           {{ otpSent ? 'Verify' : 'Send code' }}
         </button>
       </form>
 
-      <hr class="divider" >
+      <hr class="divider" />
 
       <div class="row gap-2">
         <button class="btn btn--block" @click="auth.signInWithOAuth('google')">Google</button>
@@ -139,8 +162,12 @@ async function onWallet(kind: 'phantom' | 'metamask') {
 </template>
 
 <style scoped>
-.authpage { max-width: 420px; }
-.tabs { justify-content: center; }
+.authpage {
+  max-width: 420px;
+}
+.tabs {
+  justify-content: center;
+}
 
 .chip {
   padding: 6px 14px;
@@ -150,7 +177,10 @@ async function onWallet(kind: 'phantom' | 'metamask') {
   cursor: pointer;
   font-size: 0.87rem;
 }
-.chip--on { background: var(--accent-soft); border-color: var(--accent-line); }
+.chip--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
 
 .linkish {
   background: none;
@@ -161,5 +191,7 @@ async function onWallet(kind: 'phantom' | 'metamask') {
   text-align: center;
   padding: 4px;
 }
-.linkish:hover { color: var(--fg); }
+.linkish:hover {
+  color: var(--fg);
+}
 </style>

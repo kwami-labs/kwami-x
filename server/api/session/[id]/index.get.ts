@@ -13,15 +13,12 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
 
   const db = serviceClient()
-  const { data: session, error } = await db
-    .from('game_sessions')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
+  const { data: session, error } = await db.from('game_sessions').select('*').eq('id', id).maybeSingle()
 
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
   if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session.' })
-  if (session.player_id !== user.id) throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
+  if (session.player_id !== user.id)
+    throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
 
   const { data: turns } = await db
     .from('transcript_turns')

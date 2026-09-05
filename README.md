@@ -31,15 +31,15 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 
 ## What is here
 
-| Path | |
-|---|---|
-| `app/` | Nuxt 4 app — pages, components, Pinia stores, the Three.js renderer, the Phantom binding |
-| `server/` | Nitro API — auth, Kwami CRUD, sessions, secrets, the Kwami's brain, MoonPay, the program builder |
-| `shared/` | Pure domain logic: game economics, secret matching, session state, Solana encoding |
-| `programs/kwami-vault/` | The Anchor program — escrow, sessions, settlement |
-| `supabase/migrations/` | Schema, row level security, read models |
-| `tests/` | 262 Vitest tests over the domain and utility layers |
-| `docs/` | Full documentation, also served at `/docs` |
+| Path                    |                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `app/`                  | Nuxt 4 app — pages, components, Pinia stores, the Three.js renderer, the Phantom binding         |
+| `server/`               | Nitro API — auth, Kwami CRUD, sessions, secrets, the Kwami's brain, MoonPay, the program builder |
+| `shared/`               | Pure domain logic: game economics, secret matching, session state, Solana encoding               |
+| `programs/kwami-vault/` | The Anchor program — escrow, sessions, settlement                                                |
+| `supabase/migrations/`  | Schema, row level security, read models                                                          |
+| `tests/`                | 262 Vitest tests over the domain and utility layers                                              |
+| `docs/`                 | Full documentation, also served at `/docs`                                                       |
 
 ## The interesting parts
 
@@ -53,7 +53,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 
 **An AI program builder with a real boundary.** A Kwami owner describes a financial game in plain language and gets an Anchor sub-program the vault calls at lifecycle moments. The extension has no authority over the vault PDA, so a bad one can break the owner's game but cannot drain it — which is what makes it safe to let a model write. → [docs/builder.md](docs/builder.md)
 
-**Embeddable anywhere — including wallets you never integrate with.** Any Kwami drops onto any site as an iframe or a 2KB loader script. Its NFT metadata also points `animation_url` at that embed, so Phantom, Magic Eden and Tensor render the *live* Kwami — real pot, real vitality — for free. The thumbnail is generated SVG for the same reason: a file pinned at mint would advertise a $0 pot forever. → [docs/embed.md](docs/embed.md)
+**Embeddable anywhere — including wallets you never integrate with.** Any Kwami drops onto any site as an iframe or a 2KB loader script. Its NFT metadata also points `animation_url` at that embed, so Phantom, Magic Eden and Tensor render the _live_ Kwami — real pot, real vitality — for free. The thumbnail is generated SVG for the same reason: a file pinned at mint would advertise a $0 pot forever. → [docs/embed.md](docs/embed.md)
 
 ## Commands
 

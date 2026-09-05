@@ -161,7 +161,11 @@ export async function startSessionUsdcIx(args: StartSessionUsdcArgs): Promise<Tr
       { pubkey: args.usdcMint, isSigner: false, isWritable: false },
       { pubkey: deriveAssociatedTokenAddress(args.usdcMint, args.player), isSigner: false, isWritable: true },
       { pubkey: deriveAssociatedTokenAddress(args.usdcMint, vault), isSigner: false, isWritable: true },
-      { pubkey: deriveAssociatedTokenAddress(args.usdcMint, args.treasury), isSigner: false, isWritable: true },
+      {
+        pubkey: deriveAssociatedTokenAddress(args.usdcMint, args.treasury),
+        isSigner: false,
+        isWritable: true,
+      },
       { pubkey: deriveAssociatedTokenAddress(args.usdcMint, args.author), isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -232,9 +236,7 @@ function claimWinKeys(args: ClaimWinArgs, program: PublicKey) {
     { pubkey: session, isSigner: false, isWritable: true },
     { pubkey: args.player, isSigner: true, isWritable: true },
     usdc ? { pubkey: usdc, isSigner: false, isWritable: false } : none,
-    usdc
-      ? { pubkey: deriveAssociatedTokenAddress(usdc, vault), isSigner: false, isWritable: true }
-      : none,
+    usdc ? { pubkey: deriveAssociatedTokenAddress(usdc, vault), isSigner: false, isWritable: true } : none,
     usdc
       ? { pubkey: deriveAssociatedTokenAddress(usdc, args.player), isSigner: false, isWritable: true }
       : none,
