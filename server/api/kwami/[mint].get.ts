@@ -1,4 +1,4 @@
-import { DEMO_KWAMIS, isDemoMode } from '~~/server/utils/demo'
+import { DEMO_KWAMIS, demoSessions, isDemoMode } from '~~/server/utils/demo'
 import { serviceClient } from '~~/server/utils/supabase'
 import { isValidAddress } from '~~/server/utils/solana'
 
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   if (isDemoMode()) {
     const kwami = DEMO_KWAMIS.find((k) => k.mint === mint)
     if (!kwami) throw createError({ statusCode: 404, statusMessage: 'No such Kwami.' })
-    return { demo: true, kwami, recentSessions: [] }
+    return { demo: true, kwami, recentSessions: demoSessions(kwami) }
   }
 
   if (!isValidAddress(mint)) throw createError({ statusCode: 400, statusMessage: 'Malformed mint address.' })
@@ -26,14 +26,19 @@ export default defineEventHandler(async (event) => {
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
   if (!kwami) throw createError({ statusCode: 404, statusMessage: 'No such Kwami.' })
 
-  // Outcomes only — never transcripts. Showing how previous challengers probed
-  // a Kwami would hand every later player a free map of what has been tried.
+  // Outcomes, wallets and transaction signatures — never transcripts. Showing
+  // how previous challengers probed a Kwami would hand every later player a
+  // free map of what has been tried; showing *that* they played, from which
+  // address and for how much, is already public on chain and is the whole
+  // reason a pot is credible.
   const { data: recent } = await db
     .from('game_sessions')
-    .select('id, outcome, asset, ticket_amount, started_at, payout_lamports, payout_usdc')
+    .select(
+      'id, outcome, asset, ticket_amount, started_at, payout_lamports, payout_usdc, player_wallet, tx_start, tx_claim',
+    )
     .eq('kwami_mint', mint)
     .order('started_at', { ascending: false })
-    .limit(12)
+    .limit(25)
 
   return { demo: false, kwami, recentSessions: recent ?? [] }
 })

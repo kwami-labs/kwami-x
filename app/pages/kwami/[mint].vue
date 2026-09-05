@@ -1,13 +1,55 @@
 <script setup lang="ts">
 import type { KwamiDetailResponse } from '#shared/types/api'
+import type { Cluster } from '#shared/solana/constants'
+import { explorerUrl } from '#shared/solana/constants'
+import { gameById, readVoiceConfig, voiceById } from '#shared/kwami/voice'
+
 const route = useRoute()
 const mint = computed(() => route.params.mint as string)
 
 const { data, error } = await useFetch<KwamiDetailResponse>(`/api/kwami/${mint.value}`)
 const kwami = computed(() => data.value?.kwami)
+const sessions = computed(() => data.value?.recentSessions ?? [])
 const wallet = useWalletStore()
+const cluster = computed(() => useRuntimeConfig().public.solanaCluster as Cluster)
 
-const palette = computed(() => paletteFromMint(mint.value))
+/**
+ * Every account this Kwami is made of.
+ *
+ * The vault is the one that matters and the one nobody would otherwise be able
+ * to find: it is the address actually holding the pot, and a challenger who
+ * wants to verify the headline number before paying has to be able to open it
+ * on an explorer. The rest are here because "who owns this" and "who made it"
+ * are questions with on-chain answers, and paraphrasing them into a handle
+ * would hide the only version that can be checked.
+ */
+/**
+ * What the challenger is actually buying.
+ *
+ * The game mode is a promise, not decoration: it governs what the Kwami's brain
+ * is allowed to do with the phrase, and it is the difference between three
+ * minutes that can be won and three minutes of stonewalling. Someone deciding
+ * whether to pay has to see it before they pay, not discover it afterwards.
+ */
+const contest = computed(() => {
+  const cfg = readVoiceConfig(kwami.value?.voice)
+  return { game: gameById(cfg.gameId), voice: voiceById(cfg.voiceId), guard: cfg.guardStrength }
+})
+
+const accounts = computed(() => {
+  const k = kwami.value
+  if (!k) return []
+  return [
+    { label: 'Pot (vault)', address: k.vault, note: 'Holds the money' },
+    { label: 'NFT mint', address: k.mint, note: 'The Kwami itself' },
+    { label: 'Owner', address: k.owner_wallet, note: 'Sets the rules, takes the royalty' },
+    ...(k.author_wallet && k.author_wallet !== k.owner_wallet
+      ? [{ label: 'Creator', address: k.author_wallet, note: 'Minted it' }]
+      : []),
+  ].filter((a): a is { label: string; address: string; note: string } => Boolean(a.address))
+})
+
+const palette = computed(() => paletteFor(kwami.value ?? { mint: mint.value }))
 const isOwner = computed(() => wallet.address && kwami.value?.owner_wallet === wallet.address)
 
 const embedSnippet = computed(
@@ -118,6 +160,24 @@ useSeoMeta({
         </button>
       </div>
 
+      <div class="card stack gap-2">
+        <h3>{{ contest.game.label }}</h3>
+        <p class="muted">{{ contest.game.pitch }}</p>
+        <div class="contest">
+          <div>
+            <span class="eyebrow">Voice</span><span>{{ contest.voice.label }}</span>
+          </div>
+          <div>
+            <span class="eyebrow">Guard</span><span class="num">{{ Math.round(contest.guard * 100) }}%</span>
+          </div>
+          <div>
+            <span class="eyebrow">Clock</span
+            ><span class="num">{{ Math.round((kwami.session_duration / 60) * 10) / 10 }} min</span>
+          </div>
+        </div>
+        <p class="hint">{{ contest.voice.note }}</p>
+      </div>
+
       <div v-if="kwami.hints?.length" class="card stack gap-2">
         <h3>What it has let slip</h3>
         <ul class="hints">
@@ -151,6 +211,29 @@ useSeoMeta({
         <button class="btn btn--sm btn--ghost" @click="copyEmbed">
           {{ copied ? 'Copied' : 'Copy embed code' }}
         </button>
+      </div>
+
+      <ActivityFeed :sessions="sessions" :payout-bps="kwami.payout_bps" />
+
+      <div class="card stack gap-2">
+        <h3>Accounts</h3>
+        <p class="muted">Everything above is checkable. These are the addresses it is checkable at.</p>
+        <ul class="accounts">
+          <li v-for="a in accounts" :key="a.label">
+            <div class="stack">
+              <span class="eyebrow">{{ a.label }}</span>
+              <span class="dim accounts__note">{{ a.note }}</span>
+            </div>
+            <a
+              :href="explorerUrl(a.address, cluster, 'address')"
+              target="_blank"
+              rel="noopener"
+              class="num accounts__addr"
+            >
+              {{ shortAddress(a.address, 6, 6) }} ↗
+            </a>
+          </li>
+        </ul>
       </div>
 
       <div v-if="isOwner" class="card stack gap-2">
@@ -215,6 +298,50 @@ useSeoMeta({
 }
 .pot__facts .num {
   font-size: 0.92rem;
+}
+
+.contest {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.contest > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+
+.accounts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.accounts li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.accounts li:last-child {
+  border-bottom: none;
+}
+.accounts__note {
+  font-size: 0.76rem;
+}
+.accounts__addr {
+  font-size: 0.82rem;
+  color: var(--fg-muted);
+}
+.accounts__addr:hover {
+  color: var(--fg);
 }
 
 .hints {
