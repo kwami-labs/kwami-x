@@ -60,13 +60,13 @@ The wallet layer talks to `window.phantom.solana` directly rather than through `
 1. **Client** builds `start_session_sol` and hands it to Phantom, which simulates it and shows a decoded preview.
 2. **Chain** moves the ticket into the vault, splits the fee, creates the `Session` account and stamps `started_at` from the on-chain clock.
 3. **Client** posts the signature to `/api/session/start`.
-4. **Server** fetches that transaction from the cluster, confirms it actually opened *this* session PDA, and only then writes a session row. The countdown uses the chain's `started_at`, not the server's wall clock, so the timer and settlement cannot disagree.
+4. **Server** fetches that transaction from the cluster, confirms it actually opened _this_ session PDA, and only then writes a session row. The countdown uses the chain's `started_at`, not the server's wall clock, so the timer and settlement cannot disagree.
 5. **Client** streams speech to `/api/session/[id]/transcript`.
 6. **Server** decrypts the secret, runs `matchSecret`, and on a hit returns the claim material — the pre-image, or an oracle signature.
 7. **Client** builds the claim transaction and sends it through Phantom.
 8. **Chain** verifies the proof itself and moves the money.
 
-Note what step 8 does *not* depend on: by the time the client holds the claim material, the win is claimable from the transaction alone. If the server went down at that moment, the player would still get paid.
+Note what step 8 does _not_ depend on: by the time the client holds the claim material, the win is claimable from the transaction alone. If the server went down at that moment, the player would still get paid.
 
 ## Voice, and where it stops
 
@@ -74,7 +74,7 @@ Two transports, chosen at runtime by `/api/session/:id/voice-token`.
 
 **Browser (default).** The Web Speech API for recognition and synthesis, with the Kwami's replies generated server-side by `/api/session/:id/reply`. Needs no keys, no worker and no room — which is why it is the default: a fresh clone is playable, and LiveKit becomes an upgrade rather than a prerequisite.
 
-**LiveKit.** When credentials are configured, the token endpoint mints a JWT scoped to the session's room. That is where this repository stops. The *agent* — the worker that joins the room, runs streaming STT and TTS, and speaks as the Kwami — is a separate long-running service, because a Nitro request handler cannot hold a WebRTC session open for three minutes.
+**LiveKit.** When credentials are configured, the token endpoint mints a JWT scoped to the session's room. That is where this repository stops. The _agent_ — the worker that joins the room, runs streaming STT and TTS, and speaks as the Kwami — is a separate long-running service, because a Nitro request handler cannot hold a WebRTC session open for three minutes.
 
 Either way, the win decision is identical and server-side: transcript turns go to `/api/session/:id/transcript`, which is the only place the secret is ever compared against anything.
 

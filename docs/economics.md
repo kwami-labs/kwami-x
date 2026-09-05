@@ -6,15 +6,15 @@ All of this is integer arithmetic on base units. The rules live twice — `share
 
 Of every ticket:
 
-| Share | Where it goes |
-|-------|--------------|
-| **97.5%** | The Kwami's pot |
-| **1.5%** | Protocol treasury |
-| **1.0%** | The original author, forever |
+| Share     | Where it goes                |
+| --------- | ---------------------------- |
+| **97.5%** | The Kwami's pot              |
+| **1.5%**  | Protocol treasury            |
+| **1.0%**  | The original author, forever |
 
 The author royalty is carved **out of** the protocol fee, not charged on top of it. A challenger's total cost is exactly the advertised ticket price, and the fee can never exceed `PROTOCOL_FEE_BPS` regardless of how the split is configured.
 
-The royalty follows the *author*, not the owner. Sell the NFT and the buyer collects nothing from it — you minted it, you seeded it, that share is yours for as long as the Kwami lives.
+The royalty follows the _author_, not the owner. Sell the NFT and the buyer collects nothing from it — you minted it, you seeded it, that share is yours for as long as the Kwami lives.
 
 ## The payout
 
@@ -48,7 +48,7 @@ current * 100 < high_water_mark   →   dead
 
 Both are expressed in whole US cents on chain, so the comparison is integer and the two implementations cannot drift on a floating-point edge.
 
-A Kwami sitting exactly on the 1% line survives; the rule fires strictly below it. A never-funded Kwami is not dust-dead — it has not *lost* anything, it simply has not started yet, and callers pass `hasBeenFunded: false` for that case.
+A Kwami sitting exactly on the 1% line survives; the rule fires strictly below it. A never-funded Kwami is not dust-dead — it has not _lost_ anything, it simply has not started yet, and callers pass `hasBeenFunded: false` for that case.
 
 Death is terminal. `nextState` keeps `dead` and `cracked` where they are even if someone later sends SOL to the vault, because the alternative is a Kwami that resurrects when an unrelated wallet makes a mistake.
 
@@ -66,13 +66,13 @@ A mixed SOL/USDC vault cannot be priced on chain, so an oracle pushes a valuatio
 
 Defined once in `shared/game/constants.ts` and mirrored in `programs/kwami-vault/src/state.rs`.
 
-| Constant | Value |
-|---|---|
-| `DEFAULT_PAYOUT_BPS` | 8000 (80%) |
-| `MIN_PAYOUT_BPS` / `MAX_PAYOUT_BPS` | 5000 / 9500 |
-| `DEFAULT_SESSION_DURATION_SECS` | 180 |
-| `MIN` / `MAX_SESSION_DURATION_SECS` | 30 / 900 |
-| `PROTOCOL_FEE_BPS` | 250 (2.5%) |
-| `AUTHOR_ROYALTY_BPS_OF_FEE` | 4000 (40% of the fee) |
-| `DEATH_VITALITY_THRESHOLD` | 0.01 |
-| `DEATH_FLOOR_USD` | 1 |
+| Constant                            | Value                 |
+| ----------------------------------- | --------------------- |
+| `DEFAULT_PAYOUT_BPS`                | 8000 (80%)            |
+| `MIN_PAYOUT_BPS` / `MAX_PAYOUT_BPS` | 5000 / 9500           |
+| `DEFAULT_SESSION_DURATION_SECS`     | 180                   |
+| `MIN` / `MAX_SESSION_DURATION_SECS` | 30 / 900              |
+| `PROTOCOL_FEE_BPS`                  | 250 (2.5%)            |
+| `AUTHOR_ROYALTY_BPS_OF_FEE`         | 4000 (40% of the fee) |
+| `DEATH_VITALITY_THRESHOLD`          | 0.01                  |
+| `DEATH_FLOOR_USD`                   | 1                     |

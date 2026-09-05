@@ -7,9 +7,12 @@ Any Kwami can live on any site. It stays connected to its real pot, updates as t
 ```html
 <iframe
   src="https://x.kwami.io/embed/<MINT>"
-  width="360" height="360"
-  frameborder="0" allowtransparency="true"
-  title="Kwami"></iframe>
+  width="360"
+  height="360"
+  frameborder="0"
+  allowtransparency="true"
+  title="Kwami"
+></iframe>
 ```
 
 ## Loader script
@@ -21,17 +24,17 @@ For several Kwamis on one page, or when you would rather not hand-write markup:
 <script src="https://x.kwami.io/embed.js" async></script>
 ```
 
-The loader is dependency-free, framework-free and under 2KB. It runs on someone else's page, so it assumes nothing about the host: no build step, no module loader, and no guarantee that anything else on the page is well behaved. It also keeps a `MutationObserver` running, because host pages routinely render their content *after* third-party scripts execute.
+The loader is dependency-free, framework-free and under 2KB. It runs on someone else's page, so it assumes nothing about the host: no build step, no module loader, and no guarantee that anything else on the page is well behaved. It also keeps a `MutationObserver` running, because host pages routinely render their content _after_ third-party scripts execute.
 
 ## Options
 
-| Attribute | Query param | Effect |
-|---|---|---|
-| `data-size` | — | Square size in pixels (default 320) |
-| `data-chrome="off"` | `chrome=off` | Hides the name and pot overlay |
-| `data-interactive="off"` | `interactive=off` | Removes the "Challenge" link |
-| `data-color-a` | `colorA` | Override the primary colour (hex, no `#`) |
-| `data-color-b` | `colorB` | Override the accent colour |
+| Attribute                | Query param       | Effect                                    |
+| ------------------------ | ----------------- | ----------------------------------------- |
+| `data-size`              | —                 | Square size in pixels (default 320)       |
+| `data-chrome="off"`      | `chrome=off`      | Hides the name and pot overlay            |
+| `data-interactive="off"` | `interactive=off` | Removes the "Challenge" link              |
+| `data-color-a`           | `colorA`          | Override the primary colour (hex, no `#`) |
+| `data-color-b`           | `colorB`          | Override the accent colour                |
 
 Colour overrides let a host retint a Kwami to match its own design without losing the silhouette that makes it recognisable.
 
@@ -75,7 +78,7 @@ const handle = mountKwami(canvas, {
   vitality: 0.8,
 })
 
-handle.setAudioLevel(0.4)  // call at 60fps; it smooths internally
+handle.setAudioLevel(0.4) // call at 60fps; it smooths internally
 handle.setArousal(0.9)
 handle.dispose()
 ```
