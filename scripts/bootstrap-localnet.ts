@@ -107,7 +107,13 @@ if (await connection.getAccountInfo(configPda)) {
   const oracle = Keypair.generate()
   const data = concatBytes(
     await instructionDiscriminator('initialize_config'),
-    new BorshWriter().u16(FEE_BPS).fixed(oracle.publicKey.toBytes()).toBytes(),
+    // The stablecoin mint is pinned protocol-wide now: the USDC ticket leg used to accept any
+    // mint the caller passed, so a locally-printed token bought a real session.
+    new BorshWriter()
+      .u16(FEE_BPS)
+      .fixed(oracle.publicKey.toBytes())
+      .fixed(usdcMint.publicKey.toBytes())
+      .toBytes(),
   )
   await send(connection, payer, [
     {

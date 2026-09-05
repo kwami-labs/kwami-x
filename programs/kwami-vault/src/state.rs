@@ -27,6 +27,13 @@ pub struct Config {
     pub treasury: Pubkey,
     /// Ed25519 key whose signatures resolve `Attested` sessions.
     pub oracle: Pubkey,
+    /// The one SPL mint accepted as a stablecoin ticket, protocol-wide.
+    ///
+    /// Without this the USDC leg accepted ANY mint the caller passed: a token you print
+    /// yourself buys a real session, and winning it pays out real SOL from the pot. Pinning it
+    /// here rather than per-Kwami keeps one decision in one place and lets the authority
+    /// migrate it if the canonical mint ever changes.
+    pub usdc_mint: Pubkey,
     /// Protocol fee on each ticket, in bps. Capped by `MAX_FEE_BPS`.
     pub fee_bps: u16,
     /// Blocks `start_session` protocol-wide without touching individual Kwamis.
