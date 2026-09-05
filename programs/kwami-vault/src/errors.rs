@@ -46,6 +46,8 @@ pub enum KwamiError {
     ExtensionLocked,
     #[msg("Withdrawals are only allowed while unpublished or after death.")]
     WithdrawNotAllowed,
+    #[msg("A challenge is still open; the pot cannot be withdrawn until it ends.")]
+    PotLocked,
     #[msg("Vault holds less than the requested amount.")]
     InsufficientVault,
     #[msg("Arithmetic overflow.")]

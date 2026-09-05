@@ -154,6 +154,7 @@ pub mod kwami_vault {
         kwami.state = KwamiState::Minted;
         kwami.high_water_mark_cents = 0;
         kwami.sessions_played = 0;
+        kwami.pot_locked_until = 0;
         kwami.sessions_won = 0;
         kwami.secret_revealed = false;
         kwami.extension = Pubkey::default();
@@ -263,11 +264,14 @@ pub mod kwami_vault {
             ctx.bumps.session,
         );
 
+        let expires_at = ctx.accounts.session.expires_at;
         let kwami = &mut ctx.accounts.kwami;
         kwami.sessions_played = kwami
             .sessions_played
             .checked_add(1)
             .ok_or(KwamiError::MathOverflow)?;
+        // Hold the pot until this challenge can no longer be claimed.
+        kwami.lock_pot_until(expires_at);
 
         emit!(SessionStarted {
             mint: kwami.mint,
@@ -335,11 +339,14 @@ pub mod kwami_vault {
             ctx.bumps.session,
         );
 
+        let expires_at = ctx.accounts.session.expires_at;
         let kwami = &mut ctx.accounts.kwami;
         kwami.sessions_played = kwami
             .sessions_played
             .checked_add(1)
             .ok_or(KwamiError::MathOverflow)?;
+        // Hold the pot until this challenge can no longer be claimed.
+        kwami.lock_pot_until(expires_at);
 
         emit!(SessionStarted {
             mint: kwami.mint,
@@ -498,6 +505,7 @@ pub mod kwami_vault {
     /// ticket a scam.
     pub fn withdraw_sol(ctx: Context<WithdrawSol>, amount: u64) -> Result<()> {
         let kwami = &ctx.accounts.kwami;
+        let now = Clock::get()?.unix_timestamp;
         require!(
             matches!(
                 kwami.state,
@@ -505,6 +513,8 @@ pub mod kwami_vault {
             ),
             KwamiError::WithdrawNotAllowed
         );
+        require!(now >= kwami.pot_locked_until, KwamiError::PotLocked);
+        debug_assert!(kwami.may_withdraw(now));
 
         let vault = ctx.accounts.vault.to_account_info();
         require!(
@@ -512,6 +522,10 @@ pub mod kwami_vault {
             KwamiError::InsufficientVault
         );
 
+        // The signer proved current ownership above; keep the cached field honest.
+        ctx.accounts.kwami.owner = ctx.accounts.owner.key();
+
+        let kwami = &ctx.accounts.kwami;
         pay_from_vault(
             &vault,
             &ctx.accounts.owner.to_account_info(),
@@ -525,6 +539,7 @@ pub mod kwami_vault {
     /// Owner withdraws USDC from the vault, under the same lifecycle rule.
     pub fn withdraw_usdc(ctx: Context<WithdrawUsdc>, amount: u64) -> Result<()> {
         let kwami = &ctx.accounts.kwami;
+        let now = Clock::get()?.unix_timestamp;
         require!(
             matches!(
                 kwami.state,
@@ -532,13 +547,21 @@ pub mod kwami_vault {
             ),
             KwamiError::WithdrawNotAllowed
         );
+        require!(now >= kwami.pot_locked_until, KwamiError::PotLocked);
+        debug_assert!(kwami.may_withdraw(now));
         require!(
             ctx.accounts.vault_usdc.amount >= amount,
             KwamiError::InsufficientVault
         );
 
+        // Copy what the CPI needs before releasing the immutable borrow.
         let mint_key = kwami.mint;
-        let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &[kwami.vault_bump]];
+        let vault_bump = kwami.vault_bump;
+
+        // The signer proved current ownership above; keep the cached field honest.
+        ctx.accounts.kwami.owner = ctx.accounts.owner.key();
+
+        let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &[vault_bump]];
         token_interface::transfer_checked(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -1073,12 +1096,23 @@ pub struct RecordValuation<'info> {
 
 #[derive(Accounts)]
 pub struct WithdrawSol<'info> {
-    #[account(
-        seeds = [b"kwami", kwami.mint.as_ref()],
-        bump = kwami.bump,
-        constraint = kwami.owner == owner.key() @ KwamiError::NotOwner
-    )]
+    #[account(mut, seeds = [b"kwami", kwami.mint.as_ref()], bump = kwami.bump)]
     pub kwami: Account<'info, Kwami>,
+    /// Proof that the signer holds the NFT *now*.
+    ///
+    /// Authorisation used to be `kwami.owner == owner.key()`, and `kwami.owner` is a cached
+    /// field that only the permissionless `sync_owner` refreshes — which nothing in the
+    /// application ever called. A seller therefore kept the right to drain the pot after the
+    /// sale, and a buyer who had not synced could not withdraw at all. Reading the token
+    /// account makes the check current by construction, and the handler writes the cached
+    /// field back so the rest of the program converges on the truth.
+    #[account(
+        constraint = nft_token.mint == kwami.mint @ KwamiError::NotNftHolder,
+        constraint = nft_token.owner == owner.key() @ KwamiError::NotNftHolder,
+        constraint = nft_token.amount == 1 @ KwamiError::NotNftHolder
+    )]
+    pub nft_token: InterfaceAccount<'info, TokenAccount>,
+
     /// CHECK: PDA validated by seeds.
     #[account(mut, seeds = [b"vault", kwami.mint.as_ref()], bump = kwami.vault_bump)]
     pub vault: UncheckedAccount<'info>,
@@ -1091,12 +1125,23 @@ pub struct WithdrawSol<'info> {
 
 #[derive(Accounts)]
 pub struct WithdrawUsdc<'info> {
-    #[account(
-        seeds = [b"kwami", kwami.mint.as_ref()],
-        bump = kwami.bump,
-        constraint = kwami.owner == owner.key() @ KwamiError::NotOwner
-    )]
+    #[account(mut, seeds = [b"kwami", kwami.mint.as_ref()], bump = kwami.bump)]
     pub kwami: Account<'info, Kwami>,
+    /// Proof that the signer holds the NFT *now*.
+    ///
+    /// Authorisation used to be `kwami.owner == owner.key()`, and `kwami.owner` is a cached
+    /// field that only the permissionless `sync_owner` refreshes — which nothing in the
+    /// application ever called. A seller therefore kept the right to drain the pot after the
+    /// sale, and a buyer who had not synced could not withdraw at all. Reading the token
+    /// account makes the check current by construction, and the handler writes the cached
+    /// field back so the rest of the program converges on the truth.
+    #[account(
+        constraint = nft_token.mint == kwami.mint @ KwamiError::NotNftHolder,
+        constraint = nft_token.owner == owner.key() @ KwamiError::NotNftHolder,
+        constraint = nft_token.amount == 1 @ KwamiError::NotNftHolder
+    )]
+    pub nft_token: InterfaceAccount<'info, TokenAccount>,
+
     /// CHECK: PDA validated by seeds; authority over `vault_usdc`.
     #[account(seeds = [b"vault", kwami.mint.as_ref()], bump = kwami.vault_bump)]
     pub vault: UncheckedAccount<'info>,
