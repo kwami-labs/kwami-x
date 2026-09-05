@@ -3,10 +3,15 @@ import { PHANTOM_INSTALL_URL } from '~/utils/phantom'
 
 const wallet = useWalletStore()
 const auth = useAuthStore()
+const gate = useAuthGate()
 const open = ref(false)
+const binding = ref(false)
 
 const menu = useTemplateRef<HTMLElement>('menu')
 onClickOutside(menu, () => (open.value = false))
+
+/** Whether the connected address has been proven to belong to this account. */
+const bound = computed(() => Boolean(wallet.address && auth.boundAddresses.includes(wallet.address)))
 
 async function onConnect() {
   if (wallet.status === 'unavailable') {
@@ -14,6 +19,19 @@ async function onConnect() {
     return
   }
   await wallet.connect()
+  // Connecting is a browser-level grant; it proves nothing to the server. Ask
+  // for the signature straight after, while the user is still in the flow they
+  // started, rather than ambushing them with a second prompt later.
+  if (wallet.isConnected && auth.isSignedIn) await onBind()
+}
+
+async function onBind() {
+  binding.value = true
+  try {
+    await auth.bindWallet()
+  } finally {
+    binding.value = false
+  }
 }
 
 async function onSignOut() {
@@ -25,8 +43,10 @@ async function onSignOut() {
 
 <template>
   <div class="wallet">
+    <button v-if="!auth.isSignedIn" class="btn btn--primary" @click="gate.prompt()">Sign in</button>
+
     <button
-      v-if="!wallet.isConnected"
+      v-else-if="!wallet.isConnected"
       class="btn btn--primary"
       :disabled="wallet.status === 'connecting'"
       @click="onConnect"
@@ -52,6 +72,16 @@ async function onSignOut() {
         </div>
 
         <hr class="divider" />
+
+        <div v-if="!bound" class="stack gap-2 bind">
+          <span class="hint">
+            This wallet is not linked to your account yet, so winnings and the Kwamis you mint cannot be
+            matched to you here.
+          </span>
+          <button class="btn btn--sm btn--primary" :disabled="binding" @click="onBind">
+            {{ binding ? 'Waiting for Phantom…' : 'Link this wallet' }}
+          </button>
+        </div>
 
         <div class="stack gap-1">
           <NuxtLink to="/me" class="popover__item" @click="open = false">My Kwamis</NuxtLink>
@@ -113,6 +143,13 @@ async function onSignOut() {
 }
 .popover__item--gold {
   color: var(--gold);
+}
+
+.bind {
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
 }
 
 .wallet__error {

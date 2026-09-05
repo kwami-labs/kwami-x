@@ -16,6 +16,28 @@ The author royalty is carved **out of** the protocol fee, not charged on top of 
 
 The royalty follows the _author_, not the owner. Sell the NFT and the buyer collects nothing from it — you minted it, you seeded it, that share is yours for as long as the Kwami lives.
 
+## The mint commission
+
+Minting charges a flat fee in SOL — `NUXT_PUBLIC_MINT_COMMISSION_SOL`, default **0.5** — paid
+to `NUXT_PUBLIC_PLATFORM_TREASURY` as an ordinary system transfer appended to the mint bundle.
+
+Flat rather than a share of the pot, because minting is where the platform's real costs land:
+rent for the mint account, the metadata account, the Kwami account and its vault, plus the
+program deploy an owner's extension may need. None of that scales with how popular the Kwami
+later becomes. Charging a percentage of a pot that does not exist yet would take nothing for the
+expensive part and everything for the cheap one.
+
+It is a plain `SystemProgram.transfer`, not a CPI inside the vault instruction, so Phantom
+decodes it and shows _"0.5 SOL to &lt;treasury&gt;"_ as its own line in the approval preview. The
+builder also prints it as a line item before the button is pressed — a creator who first
+discovers the fee in their wallet prompt has been ambushed, and will read every later prompt
+with suspicion.
+
+It is appended **last**, so a failure anywhere earlier in the bundle costs the creator nothing.
+
+An empty treasury adds no instruction at all, so a fresh clone pointed at devnet can mint
+without first inventing an address to pay.
+
 ## The payout
 
 The winner takes `payout_bps` of the pot — 80% by default, and the owner may set anything from 50% to 95% at mint.

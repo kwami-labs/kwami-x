@@ -13,7 +13,7 @@ bun run test:coverage  # with thresholds
 - **`unit`** — the pure domain modules, in plain Node with no Nuxt involvement. Fast enough to leave in watch mode while editing game rules.
 - **`integration`** — anything touching components, composables or auto-imports, in `happy-dom`.
 
-241 tests across 18 files. Coverage of the logic layers sits at **93% lines / 95% branches**.
+372 tests across 31 files. Coverage of the logic layers sits at **94.7% lines / 95.7% branches**.
 
 ## What is covered
 

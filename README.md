@@ -38,7 +38,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 | `shared/`               | Pure domain logic: game economics, secret matching, session state, Solana encoding               |
 | `programs/kwami-vault/` | The Anchor program — escrow, sessions, settlement                                                |
 | `supabase/migrations/`  | Schema, row level security, read models                                                          |
-| `tests/`                | 262 Vitest tests over the domain and utility layers                                              |
+| `tests/`                | 372 Vitest tests over the domain and utility layers                                              |
 | `docs/`                 | Full documentation, also served at `/docs`                                                       |
 
 ## The interesting parts
@@ -47,7 +47,9 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 
 **A hand-written Phantom binding, not wallet-adapter.** `signAndSendTransaction` gives the user Phantom's decoded transaction preview instead of an unlabelled blob; `signIn` collapses connect-then-sign into one prompt; `accountChanged` matters when there is money in escrow. → [docs/auth.md](docs/auth.md)
 
-**Six sign-in methods, one account.** Email, phone, Google, GitHub, Phantom (SIWS), MetaMask (SIWE) — all converging on the same `auth.users` row, so nothing downstream cares which door someone came through.
+**Six sign-in methods, one account.** Email, phone, Google, GitHub, Phantom (SIWS), MetaMask (SIWE) — all converging on the same `auth.users` row, so nothing downstream cares which door someone came through. The first screen is a glass panel over a live field of drifting Kwamis rather than a form on a blank page: what the product _is_ should be visible before the toll to enter it. Connecting a wallet afterwards binds it to that account by signature, never by assertion — a browser claiming an address is worth nothing when the reward for lying is someone else's payout.
+
+**Every Kwami is designed, not hashed.** A creator picks its palette, its body, its voice and the _kind_ of contest it runs — an interrogation, a riddle, a negotiation, a confession, a trial — and those choices are minted with it. The game mode is not flavour text: it reaches the Kwami's system prompt and governs what it may do with the phrase, and a challenger reads it on the profile before paying. Selling three minutes against a stonewaller to someone who was promised a riddle is how a game gets a reputation for being unwinnable. → `shared/kwami/`
 
 **Fuzzy matching that has to be exactly as forgiving as it is strict.** Speech-to-text is lossy. `"THE MÖON, REMEMBERS!"` and `"the moon rememebers"` must win; `"the moon forgets"` and `"is your secret about the moon?"` must not. That gap is the game. → `shared/game/secret.ts`
 
@@ -60,7 +62,7 @@ See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on
 ```bash
 bun run dev            # development server
 bun run build          # production build (Bun preset)
-bun run test           # 262 tests
+bun run test           # 372 tests
 bun run test:coverage  # with thresholds
 bun run typecheck      # vue-tsc over the project
 bun run lint           # ESLint
@@ -77,7 +79,7 @@ bun run db:push        # apply Supabase migrations
 
 ## Status
 
-The application, the domain layer and the documentation are complete and tested: 262 tests, 93% coverage of the logic layers, clean typecheck and lint, and a production build that serves every route.
+The application, the domain layer and the documentation are complete and tested: 372 tests, 94.7% line coverage of the logic layers, clean typecheck and lint, and a production build that serves every route.
 
 Two things are deliberately not finished, and neither is hidden:
 

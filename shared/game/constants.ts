@@ -50,3 +50,37 @@ export const MIN_TICKET_USD = 0.5
  * the Metaplex metadata at mint and therefore immutable.
  */
 export const SECONDARY_ROYALTY_BPS = 100
+
+/**
+ * Platform commission charged once, at mint, in SOL.
+ *
+ * A flat fee rather than a share of the pot: minting is where the platform's
+ * real costs land — rent for the mint, the metadata account, the Kwami account
+ * and its vault, plus the program deploy the owner's extension may need — and
+ * those costs do not scale with how popular the Kwami later becomes. Taking it
+ * as a percentage of a pot that does not exist yet would charge nothing for the
+ * expensive part and everything for the cheap one.
+ *
+ * Overridable per deployment through `NUXT_PUBLIC_MINT_COMMISSION_SOL`.
+ */
+export const DEFAULT_MINT_COMMISSION_SOL = 0.5
+
+/** The same figure in lamports, which is what the transaction actually carries. */
+export const DEFAULT_MINT_COMMISSION_LAMPORTS = 500_000_000n
+
+/**
+ * Convert a configured SOL commission into lamports.
+ *
+ * Goes through a string rather than `value * 1e9` because the configured value
+ * arrives as a decimal (`0.5`, `0.05`, `1.25`) and float multiplication of a
+ * decimal by a billion is not exact — `0.29 * 1e9` is `289999999.99999994`,
+ * which `BigInt()` refuses outright. Rounding fixes the crash but silently
+ * shifts the fee; parsing the decimal digits directly does neither.
+ */
+export function commissionToLamports(sol: number | string): bigint {
+  const text = typeof sol === 'number' ? sol.toFixed(9) : sol.trim()
+  if (!/^\d+(\.\d+)?$/.test(text)) return 0n
+  const [whole = '0', fraction = ''] = text.split('.')
+  const nineDigits = fraction.padEnd(9, '0').slice(0, 9)
+  return BigInt(whole) * LAMPORTS_PER_SOL + BigInt(nineDigits)
+}

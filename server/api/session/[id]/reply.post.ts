@@ -4,6 +4,7 @@ import { loadSecret } from '~~/server/utils/kwami-secret'
 import { respond } from '~~/server/utils/kwami-brain'
 import { assertNotDemo } from '~~/server/utils/demo'
 import { assertSessionOpen } from '~~/server/utils/session-window'
+import { readVoiceConfig } from '#shared/kwami/voice'
 
 const Body = z.object({
   utterance: z.string().min(1).max(2000),
@@ -49,10 +50,13 @@ export default defineEventHandler(async (event) => {
   const { secret } = await loadSecret(session.kwami_id)
   const secondsLeft = Math.max(0, (new Date(session.expires_at).getTime() - Date.now()) / 1000)
 
+  const voice = readVoiceConfig(kwami?.voice as Record<string, unknown> | null)
+
   const text = await respond({
     persona: kwami?.persona ?? '',
     secret,
-    guardStrength: Number((kwami?.voice as { guardStrength?: number })?.guardStrength ?? 0.6),
+    gameId: voice.gameId,
+    guardStrength: voice.guardStrength,
     history: (history ?? []) as Array<{ role: 'player' | 'kwami'; text: string }>,
     utterance: body.utterance,
     secondsLeft,

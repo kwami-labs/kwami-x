@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { validateSecret } from '#shared/game/secret'
-import { splitTicket } from '#shared/game/economy'
 import {
   DEFAULT_PAYOUT_BPS,
   DEFAULT_SESSION_DURATION_SECS,
@@ -8,13 +7,17 @@ import {
   MAX_PAYOUT_BPS,
   MIN_PAYOUT_BPS,
   USDC_BASE_UNITS,
+  commissionToLamports,
 } from '#shared/game/constants'
+import { KWAMI_PALETTES, isHexColor, suggestPalette } from '#shared/kwami/appearance'
+import { DEFAULT_VOICE_CONFIG, KWAMI_GAMES, KWAMI_VOICES } from '#shared/kwami/voice'
 import type { KwamiRenderer, ResolutionMode } from '#shared/types/kwami'
 
 definePageMeta({ title: 'Mint a Kwami' })
 
 const wallet = useWalletStore()
 const auth = useAuthStore()
+const config = useRuntimeConfig()
 const { phase, busy, error, mint, mintAddress } = useMintKwami()
 
 const form = reactive({
@@ -22,6 +25,13 @@ const form = reactive({
   tagline: '',
   persona: '',
   renderer: 'blob-xyz' as KwamiRenderer,
+  colorA: KWAMI_PALETTES[0]!.a,
+  colorB: KWAMI_PALETTES[0]!.b,
+  /** null once the creator picks colours by hand rather than by preset. */
+  paletteId: KWAMI_PALETTES[0]!.id as string | null,
+  voiceId: DEFAULT_VOICE_CONFIG.voiceId,
+  gameId: DEFAULT_VOICE_CONFIG.gameId,
+  guardStrength: DEFAULT_VOICE_CONFIG.guardStrength,
   secret: '',
   hints: ['', ''],
   ticketAsset: 'SOL' as 'SOL' | 'USDC' | 'both',
@@ -40,14 +50,71 @@ const renderers: Array<{ id: KwamiRenderer; label: string; note: string }> = [
   { id: 'black-hole', label: 'Horizon', note: 'Tight, dark, fast.' },
 ]
 
+/**
+ * Follow the name until the creator touches the colours.
+ *
+ * Someone who has typed a name and nothing else should already be looking at a
+ * Kwami that suits it, so the first screen sells the idea rather than asking
+ * for design work. The moment they choose a palette themselves, this stops —
+ * having your deliberate choice overwritten by a later keystroke in an
+ * unrelated field is worse than any default.
+ */
+const touchedPalette = ref(false)
+watch(
+  () => form.name,
+  (name) => {
+    if (touchedPalette.value || !name) return
+    const suggestion = suggestPalette(name)
+    form.colorA = suggestion.a
+    form.colorB = suggestion.b
+    form.paletteId = suggestion.id
+  },
+)
+
+function choosePalette(id: string) {
+  const palette = KWAMI_PALETTES.find((p) => p.id === id)
+  if (!palette) return
+  touchedPalette.value = true
+  form.paletteId = palette.id
+  form.colorA = palette.a
+  form.colorB = palette.b
+}
+
+function onCustomColor() {
+  touchedPalette.value = true
+  form.paletteId = null
+}
+
+const paletteValid = computed(() => isHexColor(form.colorA) && isHexColor(form.colorB))
+const palette = computed(() =>
+  paletteValid.value
+    ? { a: form.colorA, b: form.colorB }
+    : { a: KWAMI_PALETTES[0]!.a, b: KWAMI_PALETTES[0]!.b },
+)
+
 const secretCheck = computed(() => (form.secret ? validateSecret(form.secret) : { valid: false }))
 
 const ticketPreview = computed(() => {
   const lamports =
     form.ticketAsset === 'USDC' ? 0n : BigInt(Math.round(form.ticketSol * Number(LAMPORTS_PER_SOL)))
   const usdc = form.ticketAsset === 'SOL' ? 0n : BigInt(Math.round(form.ticketUsdc * Number(USDC_BASE_UNITS)))
-  return { lamports, usdc, split: splitTicket(lamports > 0n ? lamports : usdc) }
+  return { lamports, usdc }
 })
+
+/**
+ * What minting costs, before the game earns anything.
+ *
+ * Shown as a line item rather than buried in the Phantom prompt: a creator who
+ * only discovers the platform fee when their wallet asks them to approve it has
+ * been ambushed, and will read every later prompt with suspicion.
+ */
+const commissionSol = computed(
+  () => Number(commissionToLamports(config.public.mintCommissionSol as string)) / 1e9,
+)
+const commissionCharged = computed(() => commissionSol.value > 0 && Boolean(config.public.platformTreasury))
+
+const chosenGame = computed(() => KWAMI_GAMES.find((g) => g.id === form.gameId)!)
+const chosenVoice = computed(() => KWAMI_VOICES.find((v) => v.id === form.voiceId)!)
 
 const canMint = computed(
   () =>
@@ -55,11 +122,10 @@ const canMint = computed(
     auth.isSignedIn &&
     form.name.trim().length >= 2 &&
     secretCheck.value.valid &&
+    paletteValid.value &&
     (ticketPreview.value.lamports > 0n || ticketPreview.value.usdc > 0n) &&
     !busy.value,
 )
-
-const palette = computed(() => paletteFromMint(form.name || 'preview'))
 
 async function onSubmit() {
   const result = await mint({
@@ -67,6 +133,13 @@ async function onSubmit() {
     tagline: form.tagline.trim(),
     persona: form.persona.trim(),
     renderer: form.renderer,
+    appearance: { colorA: form.colorA, colorB: form.colorB },
+    voice: {
+      voiceId: form.voiceId,
+      gameId: form.gameId,
+      language: DEFAULT_VOICE_CONFIG.language,
+      guardStrength: form.guardStrength,
+    },
     secret: form.secret,
     hints: form.hints.map((h) => h.trim()).filter(Boolean),
     ticketPriceLamports: ticketPreview.value.lamports,
@@ -83,7 +156,7 @@ async function onSubmit() {
   <div class="wrap mintpage">
     <div class="stack gap-3 mintpage__form">
       <header class="stack gap-1">
-        <span class="eyebrow">Mint</span>
+        <span class="eyebrow">Build</span>
         <h1>Hide a phrase. Let people pay to find it.</h1>
         <p class="muted">
           Everything below is written to the chain once and can never be changed — not by you, not by us.
@@ -120,9 +193,13 @@ async function onSubmit() {
             separately.
           </span>
         </div>
+      </section>
+
+      <section class="card stack gap-3">
+        <h3>Form</h3>
 
         <div class="field">
-          <span class="label">Form</span>
+          <span class="label">Body</span>
           <div class="chips">
             <button
               v-for="r in renderers"
@@ -136,6 +213,86 @@ async function onSubmit() {
             </button>
           </div>
           <span class="hint">{{ renderers.find((r) => r.id === form.renderer)?.note }}</span>
+        </div>
+
+        <div class="field">
+          <span class="label">Palette</span>
+          <div class="swatches">
+            <button
+              v-for="p in KWAMI_PALETTES"
+              :key="p.id"
+              type="button"
+              class="swatch"
+              :class="{ 'swatch--on': form.paletteId === p.id }"
+              :title="p.label"
+              :aria-label="p.label"
+              :style="{ background: `linear-gradient(135deg, ${p.a}, ${p.b})` }"
+              @click="choosePalette(p.id)"
+            />
+          </div>
+          <div class="row gap-2 custom">
+            <label class="custom__pick">
+              <input v-model="form.colorA" type="color" @input="onCustomColor" />
+              <span class="dim">Core</span>
+            </label>
+            <label class="custom__pick">
+              <input v-model="form.colorB" type="color" @input="onCustomColor" />
+              <span class="dim">Rim</span>
+            </label>
+            <span class="hint grow">
+              The colours are minted with the Kwami, so it looks the same here, in the arena, and in any
+              wallet that renders its NFT.
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card stack gap-3">
+        <h3>Voice</h3>
+
+        <div class="field">
+          <span class="label">How it sounds</span>
+          <div class="chips">
+            <button
+              v-for="v in KWAMI_VOICES"
+              :key="v.id"
+              type="button"
+              class="chip"
+              :class="{ 'chip--on': form.voiceId === v.id }"
+              @click="form.voiceId = v.id"
+            >
+              {{ v.label }}
+            </button>
+          </div>
+          <span class="hint">{{ chosenVoice.note }}</span>
+        </div>
+
+        <div class="field">
+          <span class="label">The game</span>
+          <div class="modes modes--wrap">
+            <button
+              v-for="g in KWAMI_GAMES"
+              :key="g.id"
+              type="button"
+              class="mode"
+              :class="{ 'mode--on': form.gameId === g.id }"
+              @click="form.gameId = g.id"
+            >
+              <strong>{{ g.label }}</strong>
+              <span class="dim">{{ g.pitch }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="guard">
+            Guard strength <span class="num">{{ Math.round(form.guardStrength * 100) }}%</span>
+          </label>
+          <input id="guard" v-model.number="form.guardStrength" type="range" min="0" max="1" step="0.05" />
+          <span class="hint">
+            Low, and it chats and slips. High, and it stonewalls. A Kwami nobody can move sells one ticket; a
+            Kwami that gives ground sells many and eventually loses its pot.
+          </span>
         </div>
       </section>
 
@@ -276,6 +433,9 @@ async function onSubmit() {
             max="900"
             step="30"
           />
+          <span class="hint"
+            >How long a challenger gets for their money, once the clock starts on chain.</span
+          >
         </div>
 
         <div class="split">
@@ -289,19 +449,30 @@ async function onSubmit() {
       </section>
 
       <div class="card actions">
-        <div v-if="!wallet.isConnected" class="stack gap-2">
+        <div v-if="!auth.isSignedIn" class="stack gap-2">
+          <p class="muted">Sign in first, so the Kwami you mint is attached to your account.</p>
+          <NuxtLink to="/auth?next=/mint" class="btn btn--primary">Sign in</NuxtLink>
+        </div>
+        <div v-else-if="!wallet.isConnected" class="stack gap-2">
           <p class="muted">
             Connect Phantom to mint. The transaction creates the NFT and its vault in one go.
           </p>
           <button class="btn btn--primary" @click="wallet.connect()">Connect Phantom</button>
         </div>
-        <div v-else-if="!auth.isSignedIn" class="stack gap-2">
-          <p class="muted">Sign in with your wallet so the Kwami is bound to your account.</p>
-          <button class="btn btn--primary" :disabled="auth.loading" @click="auth.signInWithPhantom()">
-            Sign in with Phantom
-          </button>
-        </div>
         <div v-else class="stack gap-2">
+          <div v-if="commissionCharged" class="costs">
+            <div>
+              <span class="dim">Platform fee</span><span class="num">{{ commissionSol }} SOL</span>
+            </div>
+            <div>
+              <span class="dim">Mint, metadata, vault rent</span><span class="num dim">~0.004 SOL</span>
+            </div>
+            <div class="costs__total">
+              <span>Due on approval</span
+              ><span class="num gold">~{{ (commissionSol + 0.004).toFixed(3) }} SOL</span>
+            </div>
+          </div>
+
           <button class="btn btn--primary btn--lg btn--block" :disabled="!canMint" @click="onSubmit">
             <span v-if="phase === 'committing'">Committing the secret…</span>
             <span v-else-if="phase === 'building'">Building the transaction…</span>
@@ -341,6 +512,14 @@ async function onSubmit() {
           <div>
             <dt>Payout</dt>
             <dd class="num gold">{{ (form.payoutBps / 100).toFixed(0) }}%</dd>
+          </div>
+          <div>
+            <dt>Voice</dt>
+            <dd>{{ chosenVoice.label }}</dd>
+          </div>
+          <div>
+            <dt>Game</dt>
+            <dd>{{ chosenGame.label }}</dd>
           </div>
           <div>
             <dt>Proof</dt>
@@ -390,10 +569,62 @@ async function onSubmit() {
   color: var(--fg);
 }
 
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    transform 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.swatch:hover {
+  transform: translateY(-2px);
+}
+.swatch--on {
+  border-color: var(--fg);
+  transform: translateY(-2px);
+}
+
+.custom {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.custom__pick {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.custom__pick input[type='color'] {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+
 .modes {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+.modes--wrap {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .mode {
@@ -427,6 +658,29 @@ async function onSubmit() {
   flex-wrap: wrap;
   padding-top: 4px;
   font-size: 0.86rem;
+}
+
+.costs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  font-size: 0.86rem;
+}
+
+.costs > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.costs__total {
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
 }
 
 .actions {
