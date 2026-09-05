@@ -12,9 +12,41 @@ const kwami = computed(() => data.value?.kwami ?? null)
 const name = ref('')
 const brief = ref('')
 const hooks = ref<string[]>(['onExpire'])
-const source = ref<string | null>(null)
-const generating = ref(false)
-const error = ref<string | null>(null)
+
+const { phase, running, thinking, source, error, generate: run, cancel } = useProgramGeneration()
+
+/**
+ * Keep the reasoning feed pinned to its newest line.
+ *
+ * Only while it is at the bottom already: yanking the view back down while
+ * someone is reading an earlier paragraph is worse than not following at all.
+ */
+const feed = useTemplateRef<HTMLElement>('feed')
+watch(thinking, async () => {
+  const el = feed.value
+  if (!el) return
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+  if (!atBottom) return
+  await nextTick()
+  el.scrollTop = el.scrollHeight
+})
+
+const status = computed(() => {
+  switch (phase.value) {
+    case 'thinking':
+      return 'Working out the rules…'
+    case 'writing':
+      return 'Writing the program…'
+    case 'checking':
+      return 'Saving it…'
+    case 'done':
+      return 'Done.'
+    case 'error':
+      return 'Failed.'
+    default:
+      return ''
+  }
+})
 
 const examples = [
   {
@@ -55,21 +87,8 @@ function toggleHook(hookName: string) {
     : [...hooks.value, hookName]
 }
 
-async function generate() {
-  generating.value = true
-  error.value = null
-  source.value = null
-  try {
-    const result = await $fetch<{ source: string }>('/api/builder/generate', {
-      method: 'POST',
-      body: { kwamiMint: mint.value, name: name.value, brief: brief.value, hooks: hooks.value },
-    })
-    source.value = result.source
-  } catch (e) {
-    error.value = (e as { statusMessage?: string }).statusMessage ?? 'Generation failed.'
-  } finally {
-    generating.value = false
-  }
+function generate() {
+  return run({ kwamiMint: mint.value, name: name.value, brief: brief.value, hooks: hooks.value })
 }
 
 const copied = ref(false)
@@ -141,12 +160,14 @@ async function copySource() {
           </div>
 
           <button
+            v-if="!running"
             class="btn btn--primary btn--lg"
-            :disabled="generating || brief.length < 10 || hooks.length === 0"
+            :disabled="brief.length < 10 || hooks.length === 0"
             @click="generate"
           >
-            {{ generating ? 'Writing the program…' : 'Generate' }}
+            Generate
           </button>
+          <button v-else class="btn btn--lg" @click="cancel">Stop</button>
           <p v-if="error" class="error-text">{{ error }}</p>
         </div>
 
@@ -164,6 +185,19 @@ async function copySource() {
       </section>
 
       <section class="stack gap-2">
+        <!--
+          The reasoning feed. A generation spends most of its first minute
+          thinking, with no source to show for it — without this the builder is
+          a spinner, and a spinner cannot be told apart from a hang.
+        -->
+        <div v-if="running || thinking" class="card think">
+          <div class="row gap-2 think__bar">
+            <span class="dot dot--pulse" style="color: var(--accent)" />
+            <span class="eyebrow grow">{{ status }}</span>
+          </div>
+          <div v-if="thinking" ref="feed" class="think__feed">{{ thinking }}</div>
+        </div>
+
         <div v-if="!source" class="card output output--empty">
           <p class="dim">The generated Anchor program will appear here.</p>
         </div>
@@ -175,7 +209,7 @@ async function copySource() {
             </button>
           </div>
           <pre class="output__code"><code>{{ source }}</code></pre>
-          <div class="output__next stack gap-2">
+          <div v-if="!running" class="output__next stack gap-2">
             <h3>Next</h3>
             <ol class="steps dim">
               <li>
@@ -263,6 +297,28 @@ async function copySource() {
   gap: 6px;
   font-size: 0.85rem;
   color: var(--fg-muted);
+}
+
+.think {
+  padding: 0;
+  overflow: hidden;
+}
+.think__bar {
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--border);
+}
+
+.think__feed {
+  padding: 13px 15px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  line-height: 1.62;
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  /* The model reasons in paragraphs of plain prose; a monospace face here reads
+     as output rather than as thought. */
+  font-family: var(--font);
 }
 
 .output {

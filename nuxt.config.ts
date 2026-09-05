@@ -43,6 +43,18 @@ export default defineNuxtConfig({
       moonpayPublishableKey: '',
       livekitUrl: '',
       siteUrl: 'http://localhost:3000',
+      /**
+       * Where the mint commission is paid. Public because the browser builds
+       * the mint transaction and the user has to see the destination in
+       * Phantom's preview before approving it.
+       *
+       * Left empty by default, and an empty treasury means no commission
+       * instruction at all — a fresh clone pointed at devnet should be able to
+       * mint without first inventing an address to pay.
+       */
+      platformTreasury: '',
+      /** Flat SOL commission per mint. Decimal string; see commissionToLamports. */
+      mintCommissionSol: '0.5',
     },
   },
 
@@ -80,11 +92,15 @@ export default defineNuxtConfig({
     define: { global: 'globalThis' },
     /**
      * ES2020 or later, because every lamport amount in this app is a `bigint`
-     * literal. Under the default es2019 target esbuild warns that they "may
-     * crash at run-time" — and a crash while building a payment transaction is
-     * the worst possible place for one.
+     * literal, and a crash while building a payment transaction is the worst
+     * possible place for one.
+     *
+     * Only `build.target` is set. Vite 8 transforms with oxc rather than
+     * esbuild and warns that a `vite.esbuild` block is being ignored outright —
+     * so leaving one here would read as a guarantee the build no longer makes.
+     * `build.target` is the setting that actually governs downlevelling, and
+     * the output does carry `0n` literals through unchanged.
      */
-    esbuild: { target: 'es2020' },
     build: { target: 'es2020' },
   },
 

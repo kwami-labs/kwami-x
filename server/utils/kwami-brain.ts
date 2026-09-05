@@ -1,4 +1,5 @@
 import { matchSecret, normalizePhrase, words } from '#shared/game/secret'
+import { gameById } from '#shared/kwami/voice'
 
 /**
  * The Kwami's conversational brain.
@@ -18,6 +19,14 @@ import { matchSecret, normalizePhrase, words } from '#shared/game/secret'
 export interface BrainInput {
   persona: string
   secret: string
+  /**
+   * Which contest the creator sold.
+   *
+   * A challenger reads the game on the profile page and pays on the strength of
+   * it, so it has to reach the model — a Kwami advertised as a riddle that then
+   * stonewalls has taken money under a description of a different product.
+   */
+  gameId?: string
   /** 0 = chatty, 1 = adversarial. */
   guardStrength: number
   history: Array<{ role: 'player' | 'kwami'; text: string }>
@@ -71,6 +80,8 @@ async function respondWithClaude(input: BrainInput): Promise<string> {
         ? 'You are playful but careful. Tease. Give texture, never substance.'
         : 'You are talkative and warm, and you enjoy the game. You may skirt closer than is wise.'
 
+  const game = gameById(input.gameId)
+
   const clock =
     input.secondsLeft < 30
       ? `They have ${Math.round(input.secondsLeft)} seconds left. You know it. Let that colour how you answer.`
@@ -82,6 +93,7 @@ async function respondWithClaude(input: BrainInput): Promise<string> {
     system: [
       SYSTEM,
       `Your persona: ${input.persona || 'Enigmatic and sparing with words.'}`,
+      `The game you are playing is "${game.label}". ${game.directive}`,
       guard,
       // The phrase is given so the model can steer *around* it. Withholding it
       // would leave the Kwami free to blunder into the phrase by coincidence.
@@ -154,6 +166,14 @@ export function respondScripted(input: BrainInput): string {
     return pick(CLOSING, input.history.length)
   }
 
+  // The scripted Kwami cannot play a game, but it can at least stay in the one
+  // it was sold as. A Confession Kwami that answers like an interrogator would
+  // read as the mode having no effect at all.
+  const flavour = SCRIPTED_FLAVOUR[gameById(input.gameId).id]
+  if (flavour && input.history.length % 3 === 2) {
+    return pick(flavour, input.history.length)
+  }
+
   // Acknowledge overlap without confirming anything — enough of a signal to
   // keep someone talking, not enough to narrow the search.
   const overlap = spoken.filter((w) => secretWords.includes(w)).length
@@ -166,6 +186,18 @@ export function respondScripted(input: BrainInput): string {
   }
 
   return pick(DEFLECTIONS, input.history.length)
+}
+
+/** One line per game, so the scripted fallback is recognisably in character. */
+const SCRIPTED_FLAVOUR: Record<string, readonly [string, ...string[]]> = {
+  interrogation: ['You are asking. I am not answering.', 'Next question. Same answer.'],
+  riddle: [
+    'Closer. Think about what a thing is called before it is named.',
+    'You have the shape. Not the sound.',
+  ],
+  negotiation: ['Offer me something first.', 'You want it. Tell me what it is worth to you.'],
+  confession: ['I want to tell you. I open my mouth and — no.', 'It is right there. It will not come out.'],
+  trial: ['My turn. Why should I give it to you?', 'Answer me that first, and we will see.'],
 }
 
 function pick<T>(list: readonly [T, ...T[]], seed: number): T {

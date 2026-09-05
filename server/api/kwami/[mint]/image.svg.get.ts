@@ -1,4 +1,4 @@
-import { paletteFromMint } from '#shared/game/palette'
+import { paletteFor } from '#shared/kwami/appearance'
 import { DEMO_KWAMIS, isDemoMode } from '~~/server/utils/demo'
 import { serviceClient } from '~~/server/utils/supabase'
 import { isValidAddress } from '~~/server/utils/solana'
@@ -14,8 +14,9 @@ import { isValidAddress } from '~~/server/utils/solana'
  * SVG also means no image pipeline, no object storage and no bill — every
  * client that renders an NFT thumbnail renders SVG.
  *
- * The palette is derived from the mint with the same hash the app uses, so the
- * thumbnail, the card and the live 3D object are recognisably the same being.
+ * The palette comes from the same module the app renders with, so the
+ * thumbnail, the card and the live 3D object are recognisably the same being —
+ * including when the creator chose the colours by hand.
  */
 export default defineEventHandler(async (event) => {
   const mint = getRouterParam(event, 'mint')
@@ -24,7 +25,7 @@ export default defineEventHandler(async (event) => {
   const kwami = isDemoMode() ? DEMO_KWAMIS.find((k) => k.mint === mint) : await loadKwami(mint)
   if (!kwami) throw createError({ statusCode: 404, statusMessage: 'No such Kwami.' })
 
-  const { a, b } = paletteFromMint(mint)
+  const { a, b } = paletteFor(kwami)
   const potUsd = kwami.value_cents / 100
   const vitality = Math.max(0, Math.min(1, kwami.vitality))
   // Match the app's square-root vitality scale, so a dying Kwami looks as
@@ -79,8 +80,6 @@ async function loadKwami(mint: string) {
   const { data } = await serviceClient().from('kwamis_public').select('*').eq('mint', mint).maybeSingle()
   return data
 }
-
-/** The same hash the client uses, so a Kwami looks like itself everywhere. */
 
 /** Kwami names are user-supplied and land inside an XML document. */
 function escapeXml(value: string): string {

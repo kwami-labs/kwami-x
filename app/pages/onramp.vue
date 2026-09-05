@@ -7,6 +7,7 @@ const auth = useAuthStore()
 const amount = ref(50)
 const currency = ref<'sol' | 'usdc_sol'>('sol')
 const widgetUrl = ref<string | null>(null)
+const api = useApi()
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -15,7 +16,7 @@ async function openWidget() {
   loading.value = true
   error.value = null
   try {
-    const { url } = await $fetch<{ url: string }>('/api/moonpay/sign', {
+    const { url } = await api<{ url: string }>('/api/moonpay/sign', {
       method: 'POST',
       body: {
         walletAddress: wallet.address,

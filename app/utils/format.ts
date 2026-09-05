@@ -71,5 +71,9 @@ export function relativeTime(iso: string | number | Date): string {
   return 'just now'
 }
 
-// Defined in shared/ so the SVG thumbnail and the WebGL renderer cannot drift from the CSS.
-export { paletteFromMint } from '#shared/game/palette'
+/**
+ * Palette helpers live in `#shared/kwami/appearance` so the server-rendered NFT
+ * thumbnail derives colours with the same code the browser does. Re-exported
+ * here because every component in the app already imports from this module.
+ */
+export { paletteFor, paletteFromMint } from '#shared/kwami/appearance'

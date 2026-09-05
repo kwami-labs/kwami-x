@@ -58,6 +58,12 @@ export interface SessionSummary {
   started_at: string
   payout_lamports: number
   payout_usdc: number
+  /** The challenger's address. Public — it is the fee payer on a public chain. */
+  player_wallet: string
+  /** Signature of the ticket transaction that opened the session. */
+  tx_start: string | null
+  /** Signature of the settlement transaction, when the challenger won. */
+  tx_claim: string | null
 }
 
 export interface KwamiDetailResponse {

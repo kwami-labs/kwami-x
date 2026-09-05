@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia'
 import type { Session, User } from '@supabase/supabase-js'
 import bs58 from 'bs58'
+import { createApiFetch } from '~/utils/api'
+
+export interface BoundWallet {
+  chain: 'solana' | 'ethereum'
+  address: string
+  isPrimary: boolean
+}
 
 export type AuthProvider = 'email' | 'phone' | 'google' | 'github' | 'phantom' | 'metamask'
 
@@ -22,6 +29,19 @@ export const useAuthStore = defineStore('auth', () => {
   const session = ref<Session | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  /**
+   * Whether the stored session has been read back yet.
+   *
+   * The sign-in gate keys off this rather than off `isSignedIn` alone: a
+   * returning user's session lives in local storage, which is unreadable during
+   * SSR and for the first tick after hydration. Gating on "not signed in" alone
+   * would flash the sign-in modal in the face of someone who is already signed
+   * in, on every single page load.
+   */
+  const ready = ref(false)
+
+  /** Solana addresses already proven to the server, so a reconnect does not re-prompt. */
+  const boundAddresses = ref<string[]>([])
 
   const isSignedIn = computed(() => user.value !== null)
   const displayName = computed(() => {
@@ -36,14 +56,22 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   async function init() {
-    const { data } = await supabase.auth.getSession()
-    session.value = data.session
-    user.value = data.session?.user ?? null
+    try {
+      const { data } = await supabase.auth.getSession()
+      session.value = data.session
+      user.value = data.session?.user ?? null
 
-    supabase.auth.onAuthStateChange((_event, next) => {
-      session.value = next
-      user.value = next?.user ?? null
-    })
+      supabase.auth.onAuthStateChange((_event, next) => {
+        session.value = next
+        user.value = next?.user ?? null
+        if (next?.user) void loadWallets()
+      })
+    } finally {
+      // Even a failed read is a finished one. Leaving `ready` false on error
+      // would hang the gate on a spinner with no way past it.
+      ready.value = true
+    }
+    if (user.value) void loadWallets()
   }
 
   /** Record an error and abort. Returns `never`, so callers narrow correctly after it. */
@@ -52,6 +80,63 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
     throw new Error(message)
   }
+
+  /**
+   * Prove the connected Solana address belongs to this account and store it.
+   *
+   * Kwami ownership and every payout are addressed on chain, but the app has to
+   * know which account an address belongs to long before a wallet is connected
+   * again — to show someone their own Kwamis, to name a winner in an activity
+   * feed, to reach an owner. The server re-derives the binding from the
+   * signature rather than trusting this call, so a hostile client can only bind
+   * an address it can actually sign for.
+   *
+   * The already-bound check comes first and costs one GET, because the
+   * alternative is a wallet popup on every page load for someone who bound the
+   * same address last week — a prompt with nothing to approve is how users
+   * learn to click through prompts without reading them.
+   */
+  async function bindWallet(): Promise<boolean> {
+    if (!import.meta.client || !user.value || !wallet.address) return false
+    const address = wallet.address
+    if (boundAddresses.value.includes(address)) return true
+
+    try {
+      const { nonce } = await $fetch<{ nonce: string }>('/api/auth/nonce', { method: 'POST', body: {} })
+      const signed = await wallet.signIn(nonce)
+      const { wallets } = await authedFetch<{ wallets: BoundWallet[] }>('/api/me/wallet', {
+        method: 'POST',
+        body: { message: signed.message, signature: bs58.encode(signed.signature), address: signed.address },
+      })
+      boundAddresses.value = wallets.filter((w) => w.chain === 'solana').map((w) => w.address)
+      return true
+    } catch (e) {
+      // A refused signature is a choice, not a fault. The user stays signed in
+      // and simply has no payout address on file until they agree to prove one.
+      error.value = (e as Error).message
+      return false
+    }
+  }
+
+  /** Read back the addresses already proven for this account. */
+  async function loadWallets() {
+    if (!import.meta.client || !user.value) return
+    try {
+      const { wallets } = await authedFetch<{ wallets: BoundWallet[] }>('/api/me/wallet')
+      boundAddresses.value = wallets.filter((w) => w.chain === 'solana').map((w) => w.address)
+    } catch {
+      boundAddresses.value = []
+    }
+  }
+
+  /**
+   * `$fetch` with the Supabase access token attached.
+   *
+   * The store cannot call `useApi()` — that composable resolves this very store
+   * — so it builds an instance from the same factory rather than growing a
+   * second implementation that could drift from it.
+   */
+  const authedFetch = createApiFetch(() => session.value?.access_token)
 
   async function signInWithEmail(email: string, password: string) {
     loading.value = true
@@ -208,6 +293,7 @@ export const useAuthStore = defineStore('auth', () => {
     await supabase.auth.signOut()
     user.value = null
     session.value = null
+    boundAddresses.value = []
   }
 
   return {
@@ -215,6 +301,7 @@ export const useAuthStore = defineStore('auth', () => {
     session,
     loading,
     error,
+    ready,
     isSignedIn,
     displayName,
     payoutAddress,
@@ -226,6 +313,10 @@ export const useAuthStore = defineStore('auth', () => {
     signInWithOAuth,
     signInWithPhantom,
     signInWithMetaMask,
+    boundAddresses,
+    bindWallet,
+    loadWallets,
+    authedFetch,
     signOut,
   }
 })
