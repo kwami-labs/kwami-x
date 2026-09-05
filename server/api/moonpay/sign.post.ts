@@ -30,7 +30,8 @@ export default defineEventHandler(async (event) => {
   if (!config.public.moonpayPublishableKey || !config.moonpaySecretKey) {
     throw createError({
       statusCode: 503,
-      statusMessage: 'MoonPay is not configured. Set NUXT_PUBLIC_MOONPAY_PUBLISHABLE_KEY and NUXT_MOONPAY_SECRET_KEY.',
+      statusMessage:
+        'MoonPay is not configured. Set NUXT_PUBLIC_MOONPAY_PUBLISHABLE_KEY and NUXT_MOONPAY_SECRET_KEY.',
     })
   }
 

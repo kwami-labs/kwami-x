@@ -22,7 +22,13 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
         </NuxtLink>
 
         <nav class="nav">
-          <NuxtLink v-for="item in nav" :key="item.to" :to="item.to" class="nav__link" :class="{ 'nav__link--on': isActive(item.to) }">
+          <NuxtLink
+            v-for="item in nav"
+            :key="item.to"
+            :to="item.to"
+            class="nav__link"
+            :class="{ 'nav__link--on': isActive(item.to) }"
+          >
             {{ item.label }}
           </NuxtLink>
         </nav>
@@ -41,7 +47,9 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
         <div class="row gap-3">
           <NuxtLink to="/docs" class="dim">Docs</NuxtLink>
           <NuxtLink to="/docs/embed" class="dim">Embed</NuxtLink>
-          <a href="https://github.com/kwami-labs/kwami-x" target="_blank" rel="noopener" class="dim">GitHub</a>
+          <a href="https://github.com/kwami-labs/kwami-x" target="_blank" rel="noopener" class="dim"
+            >GitHub</a
+          >
         </div>
       </div>
     </footer>
@@ -76,8 +84,13 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
   font-size: 1.05rem;
 }
 
-.brand__word { color: var(--fg); }
-.brand__ver { font-size: 0.68rem; padding: 1px 7px; }
+.brand__word {
+  color: var(--fg);
+}
+.brand__ver {
+  font-size: 0.68rem;
+  padding: 1px 7px;
+}
 
 .nav {
   display: flex;
@@ -90,13 +103,24 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
   border-radius: var(--radius-pill);
   font-size: 0.92rem;
   color: var(--fg-muted);
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 }
 
-.nav__link:hover { color: var(--fg); background: var(--panel); }
-.nav__link--on { color: var(--fg); background: var(--panel-strong); }
+.nav__link:hover {
+  color: var(--fg);
+  background: var(--panel);
+}
+.nav__link--on {
+  color: var(--fg);
+  background: var(--panel-strong);
+}
 
-.main { flex: 1; padding-block: 40px 80px; }
+.main {
+  flex: 1;
+  padding-block: 40px 80px;
+}
 
 .footer {
   border-top: 1px solid var(--border);
@@ -113,6 +137,8 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
 }
 
 @media (max-width: 760px) {
-  .nav { display: none; }
+  .nav {
+    display: none;
+  }
 }
 </style>

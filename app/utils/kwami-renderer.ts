@@ -46,11 +46,51 @@ export interface RendererParams {
 }
 
 export const RENDERER_PRESETS: Record<KwamiRenderer, RendererParams> = {
-  'blob-xyz': { amplitude: 0.34, frequency: 1.4, reactivity: 0.9, spin: 0.16, rimPower: 2.4, detail: 5, particles: 0 },
-  'crystal-ball': { amplitude: 0.1, frequency: 3.4, reactivity: 0.45, spin: 0.1, rimPower: 4.2, detail: 4, particles: 120 },
-  'orbital-shards': { amplitude: 0.52, frequency: 2.1, reactivity: 1.3, spin: 0.34, rimPower: 1.8, detail: 3, particles: 260 },
-  'stars-genesis': { amplitude: 0.2, frequency: 0.9, reactivity: 0.7, spin: 0.06, rimPower: 3, detail: 5, particles: 700 },
-  'black-hole': { amplitude: 0.07, frequency: 5, reactivity: 0.3, spin: 0.5, rimPower: 6, detail: 5, particles: 340 },
+  'blob-xyz': {
+    amplitude: 0.34,
+    frequency: 1.4,
+    reactivity: 0.9,
+    spin: 0.16,
+    rimPower: 2.4,
+    detail: 5,
+    particles: 0,
+  },
+  'crystal-ball': {
+    amplitude: 0.1,
+    frequency: 3.4,
+    reactivity: 0.45,
+    spin: 0.1,
+    rimPower: 4.2,
+    detail: 4,
+    particles: 120,
+  },
+  'orbital-shards': {
+    amplitude: 0.52,
+    frequency: 2.1,
+    reactivity: 1.3,
+    spin: 0.34,
+    rimPower: 1.8,
+    detail: 3,
+    particles: 260,
+  },
+  'stars-genesis': {
+    amplitude: 0.2,
+    frequency: 0.9,
+    reactivity: 0.7,
+    spin: 0.06,
+    rimPower: 3,
+    detail: 5,
+    particles: 700,
+  },
+  'black-hole': {
+    amplitude: 0.07,
+    frequency: 5,
+    reactivity: 0.3,
+    spin: 0.5,
+    rimPower: 6,
+    detail: 5,
+    particles: 340,
+  },
 }
 
 /**
@@ -199,10 +239,18 @@ export interface KwamiRendererHandle {
  * and pushing every audio frame through Vue's reactivity would schedule a
  * component update per frame for values only the GPU ever reads.
  */
-export function mountKwami(canvas: HTMLCanvasElement, options: KwamiRendererOptions = {}): KwamiRendererHandle {
+export function mountKwami(
+  canvas: HTMLCanvasElement,
+  options: KwamiRendererOptions = {},
+): KwamiRendererHandle {
   const preset = RENDERER_PRESETS[options.renderer ?? 'blob-xyz']
 
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' })
+  const renderer = new WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: true,
+    powerPreference: 'high-performance',
+  })
   // Capping at 2 rather than using the raw ratio: a 3x phone display gains
   // nothing visible here and costs a third of the frame budget.
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))

@@ -249,7 +249,12 @@ describe('claimWinRevealIx', () => {
 
 describe('claimWinAttestedIx', () => {
   it('appends the instructions sysvar, which the program reads the signature back from', async () => {
-    const ix = await claimWinAttestedIx({ mint: MINT, player: CREATOR, nonce: 0n, validUntil: 1_800_000_000n })
+    const ix = await claimWinAttestedIx({
+      mint: MINT,
+      player: CREATOR,
+      nonce: 0n,
+      validUntil: 1_800_000_000n,
+    })
     expect(ix.keys.length).toBe(11)
     expect(ix.keys[10]!.pubkey.toBase58()).toBe('Sysvar1nstructions1111111111111111111111111')
   })

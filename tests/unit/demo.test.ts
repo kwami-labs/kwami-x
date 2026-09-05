@@ -21,7 +21,10 @@ describe('demo dataset', () => {
 
   it('computes value_cents consistently with vaultUsd at the seeded SOL price', () => {
     for (const k of DEMO_KWAMIS) {
-      const usd = vaultUsd({ lamports: BigInt(k.balance_lamports), usdcBaseUnits: BigInt(k.balance_usdc) }, 150)
+      const usd = vaultUsd(
+        { lamports: BigInt(k.balance_lamports), usdcBaseUnits: BigInt(k.balance_usdc) },
+        150,
+      )
       expect(k.value_cents, k.name).toBe(Math.round(usd * 100))
     }
   })

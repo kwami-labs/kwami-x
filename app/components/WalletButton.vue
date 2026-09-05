@@ -25,7 +25,12 @@ async function onSignOut() {
 
 <template>
   <div class="wallet">
-    <button v-if="!wallet.isConnected" class="btn btn--primary" :disabled="wallet.status === 'connecting'" @click="onConnect">
+    <button
+      v-if="!wallet.isConnected"
+      class="btn btn--primary"
+      :disabled="wallet.status === 'connecting'"
+      @click="onConnect"
+    >
       <span v-if="wallet.status === 'connecting'">Connecting…</span>
       <span v-else-if="wallet.status === 'unavailable'">Get Phantom</span>
       <span v-else>Connect wallet</span>
@@ -46,7 +51,7 @@ async function onSignOut() {
           </div>
         </div>
 
-        <hr class="divider" >
+        <hr class="divider" />
 
         <div class="stack gap-1">
           <NuxtLink to="/me" class="popover__item" @click="open = false">My Kwamis</NuxtLink>
@@ -57,7 +62,7 @@ async function onSignOut() {
           </NuxtLink>
         </div>
 
-        <hr class="divider" >
+        <hr class="divider" />
 
         <button class="popover__item danger" @click="onSignOut">Disconnect</button>
       </div>
@@ -68,8 +73,12 @@ async function onSignOut() {
 </template>
 
 <style scoped>
-.wallet { position: relative; }
-.wallet__menu { position: relative; }
+.wallet {
+  position: relative;
+}
+.wallet__menu {
+  position: relative;
+}
 
 .popover {
   position: absolute;
@@ -93,11 +102,18 @@ async function onSignOut() {
   cursor: pointer;
   font-size: 0.9rem;
   color: var(--fg-muted);
-  transition: background 0.14s ease, color 0.14s ease;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
 }
 
-.popover__item:hover { background: var(--panel); color: var(--fg); }
-.popover__item--gold { color: var(--gold); }
+.popover__item:hover {
+  background: var(--panel);
+  color: var(--fg);
+}
+.popover__item--gold {
+  color: var(--gold);
+}
 
 .wallet__error {
   position: absolute;

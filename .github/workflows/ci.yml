@@ -1,0 +1,184 @@
+name: ci
+
+# The quality gate for every channel.
+#
+#   feature/* → dev → stg → main
+#
+# Gates run on PRs into `dev`, `stg` and `main`, and again on the push that lands them. A
+# stg → main PR therefore gets the full suite before anyone merges it, and `release.yml` only
+# fires on the back of a green run here — no version is ever cut from a red commit.
+#
+# The full matrix runs on every channel. Kwami v3 custodies real SOL and USDC; there is no
+# environment where a broken settlement path is survivable.
+on:
+  pull_request:
+    branches: [dev, stg, main]
+  push:
+    branches: [dev, stg, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  commits:
+    name: commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-workspace
+        with:
+          node: 'true'
+
+      - name: Lint commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # First-parent only. A promote PR absorbs history from the channel below it, and
+          # re-litigating subjects that already shipped would fail every promotion.
+          while IFS= read -r sha; do
+            git log -1 --pretty=%B "$sha" | bunx commitlint --verbose
+          done < <(git rev-list --first-parent "${BASE_SHA}..${HEAD_SHA}")
+
+  verify:
+    name: lint · format · typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Format
+        run: bun run format:check
+
+      - name: Typecheck
+        run: bun run typecheck
+
+  test:
+    name: tests (vitest)
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-workspace
+
+      # Coverage runs the same tests plus the ratchet in vitest.config.ts — not both.
+      - name: Unit and integration tests
+        run: bun run test:coverage
+
+      - name: CI scripts (node:test)
+        run: bun run test:ci-scripts
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  program:
+    name: anchor program (rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # The vault holds every Kwami's pot. It has to compile, lint clean and pass its own
+    # tests before anything that talks to it is allowed to ship.
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: programs
+
+      - name: Format
+        working-directory: programs
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        working-directory: programs
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Unit tests
+        working-directory: programs
+        run: cargo test --all
+
+      # `anchor build` needs the Solana toolchain, which is a slow install — do it once,
+      # cached, and only after the cheap checks above have passed.
+      - name: Install Solana and Anchor
+        run: |
+          set -euo pipefail
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build the program
+        working-directory: programs
+        run: cargo build-sbf
+
+  build:
+    name: build (nuxt)
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Build
+        run: bun run build
+
+      - name: Assert the server bundle exists
+        run: |
+          set -euo pipefail
+          test -s .output/server/index.mjs || { echo "::error::missing .output/server/index.mjs"; exit 1; }
+          {
+            echo '### Build'
+            echo ''
+            echo "Output is $(du -sh .output | cut -f1) across $(find .output -type f | wc -l) files."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: output
+          path: .output/
+          retention-days: 7
+
+  gate:
+    name: ci gate
+    needs: [commits, verify, test, program, build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # One required status check to protect the branches with, instead of five that each
+      # have to be re-added by name whenever a job is renamed. `commits` is skipped on push,
+      # so `skipped` counts as passing — `failure` and `cancelled` never do.
+      - name: Require no failures
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "job results: ${RESULTS}"
+          for result in ${RESULTS}; do
+            case "$result" in
+              success | skipped) ;;
+              *) echo "::error::ci failed (${RESULTS})"; exit 1 ;;
+            esac
+          done
+          echo "All gates green."

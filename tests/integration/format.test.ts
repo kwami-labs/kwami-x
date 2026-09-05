@@ -101,8 +101,12 @@ describe('paletteFromMint', () => {
 
   it('produces two distinct, legible hues', () => {
     const { a, b } = paletteFromMint('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU')
-    expect(a).toMatch(/^hsl\(\d+ \d+% \d+%\)$/)
-    expect(b).toMatch(/^hsl\(\d+ \d+% \d+%\)$/)
+    // Comma form, not CSS Color 4's space form. This assertion used to demand the space form
+    // and so pinned in the bug that rendered every avatar white: three.js cannot parse it.
+    // tests/unit/palette.test.ts asserts the property that actually matters — that a real
+    // THREE.Color parses these to something other than white.
+    expect(a).toMatch(/^hsl\(\d+, \d+%, \d+%\)$/)
+    expect(b).toMatch(/^hsl\(\d+, \d+%, \d+%\)$/)
     expect(a).not.toBe(b)
   })
 })

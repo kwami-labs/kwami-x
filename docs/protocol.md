@@ -15,7 +15,7 @@ The fee has a hard ceiling (`MAX_FEE_BPS`, 5%) enforced in `update_config`, so a
 
 ### `Kwami` — `["kwami", mint]`
 
-One per NFT. The important property is what it *lacks*: there is no setter for the secret hash, either ticket price, the session length, the payout split, the resolution mode or the extension. Those are written once in `create_kwami` and are immutable for the life of the token.
+One per NFT. The important property is what it _lacks_: there is no setter for the secret hash, either ticket price, the session length, the payout split, the resolution mode or the extension. Those are written once in `create_kwami` and are immutable for the life of the token.
 
 What does change: `state`, `owner` (via `sync_owner`), the session counters, and the high-water mark.
 
@@ -31,7 +31,7 @@ One challenge. `start_session_*` requires `nonce == kwami.sessions_played`, whic
 
 The seeds are derived at `init`, where the nonce is an instruction argument. On the **claim** path the session is validated by its contents instead — `session.kwami == kwami.key()` and `session.player == player.key()` — rather than by re-deriving its address from a nonce that lives inside the account being validated.
 
-That is sufficient. The account must be program-owned and deserialize as a `Session`; it must belong to this Kwami; and it must belong to the signer. The only substitution left is one of the caller's *own* sessions against the same Kwami, and the nonce rule allows only one of those to be open while `settle_win` refuses anything resolved or past its deadline.
+That is sufficient. The account must be program-owned and deserialize as a `Session`; it must belong to this Kwami; and it must belong to the signer. The only substitution left is one of the caller's _own_ sessions against the same Kwami, and the nonce rule allows only one of those to be open while `settle_win` refuses anything resolved or past its deadline.
 
 ### `Extension` — `["extension", mint]`
 
@@ -39,21 +39,21 @@ An opt-in record binding a Kwami to an owner-authored sub-program. See [Program 
 
 ## Instructions
 
-| Instruction | Who | What it does |
-|---|---|---|
-| `initialize_config` | deployer | One-time protocol setup |
-| `update_config` | authority | Fee, oracle, treasury, pause |
-| `create_kwami` | anyone | Creates the Kwami account and vault alongside a fresh NFT |
-| `publish` / `pause` | owner | Opens or closes the Kwami to challengers |
-| `sync_owner` | anyone | Points `Kwami::owner` at the current NFT holder |
-| `start_session_sol` | player | Pays a SOL ticket, opens a session |
-| `start_session_usdc` | player | Pays a USDC ticket, opens a session |
-| `claim_win_reveal` | player | Claims a win by revealing the pre-image |
-| `claim_win_attested` | player | Claims a win with an oracle signature |
-| `settle_session` | anyone | Closes an expired session, returns its rent |
-| `record_valuation` | oracle | Records USD value, applies the death rules |
-| `withdraw_sol` / `withdraw_usdc` | owner | Only while unpublished or after death |
-| `register_extension` | owner | Attaches a sub-program, before first publish |
+| Instruction                      | Who       | What it does                                              |
+| -------------------------------- | --------- | --------------------------------------------------------- |
+| `initialize_config`              | deployer  | One-time protocol setup                                   |
+| `update_config`                  | authority | Fee, oracle, treasury, pause                              |
+| `create_kwami`                   | anyone    | Creates the Kwami account and vault alongside a fresh NFT |
+| `publish` / `pause`              | owner     | Opens or closes the Kwami to challengers                  |
+| `sync_owner`                     | anyone    | Points `Kwami::owner` at the current NFT holder           |
+| `start_session_sol`              | player    | Pays a SOL ticket, opens a session                        |
+| `start_session_usdc`             | player    | Pays a USDC ticket, opens a session                       |
+| `claim_win_reveal`               | player    | Claims a win by revealing the pre-image                   |
+| `claim_win_attested`             | player    | Claims a win with an oracle signature                     |
+| `settle_session`                 | anyone    | Closes an expired session, returns its rent               |
+| `record_valuation`               | oracle    | Records USD value, applies the death rules                |
+| `withdraw_sol` / `withdraw_usdc` | owner     | Only while unpublished or after death                     |
+| `register_extension`             | owner     | Attaches a sub-program, before first publish              |
 
 ## The NFT
 
@@ -65,7 +65,7 @@ Two properties come out of that ordering:
 
 **It is immutable.** The metadata is written with `isMutable: false`. A Kwami's name and image are as fixed as its game rules — an owner cannot rename one, or repoint its image, after people have paid to play it.
 
-Metadata is created *before* the authority is revoked, because the Token Metadata program requires the mint authority to sign.
+Metadata is created _before_ the authority is revoked, because the Token Metadata program requires the mint authority to sign.
 
 ### Metadata that stays current
 
@@ -104,9 +104,9 @@ The `0x1f` separator matters more than it looks: without it, `("ab", "cd")` and 
 
 ### Attested (oracle-witnessed)
 
-A registered oracle signs `"KWAMIWIN" || session || player || valid_until` with ed25519. The client prepends a native `Ed25519Program` instruction; the runtime verifies the signature, and the program reads that instruction back through the instructions sysvar to confirm *what* was verified.
+A registered oracle signs `"KWAMIWIN" || session || player || valid_until` with ed25519. The client prepends a native `Ed25519Program` instruction; the runtime verifies the signature, and the program reads that instruction back through the instructions sysvar to confirm _what_ was verified.
 
-That read-back is the whole security of the mechanism. Solana has no syscall to check an ed25519 signature inside a program, so the runtime does it — but without inspecting the instruction afterwards, a caller could have the runtime verify a signature over an attacker-chosen message and the program would never know. `attestation.rs` checks the program id, the signature count, the signer key and the message bytes, and requires the instruction to sit *immediately* before the claim so it cannot be double-counted.
+That read-back is the whole security of the mechanism. Solana has no syscall to check an ed25519 signature inside a program, so the runtime does it — but without inspecting the instruction afterwards, a caller could have the runtime verify a signature over an attacker-chosen message and the program would never know. `attestation.rs` checks the program id, the signature count, the signer key and the message bytes, and requires the instruction to sit _immediately_ before the claim so it cannot be double-counted.
 
 The message binds three things: the session, the player and a deadline. Drop any one of them and a captured attestation becomes replayable against another session, by another wallet, or forever.
 
@@ -114,7 +114,7 @@ The oracle can only witness. The program gives it no authority to move funds, so
 
 ## Paying out of the vault
 
-The vault is a system-owned PDA carrying no data, which is what makes its lamport balance *be* the SOL pot with no parallel accounting to drift out of sync.
+The vault is a system-owned PDA carrying no data, which is what makes its lamport balance _be_ the SOL pot with no parallel accounting to drift out of sync.
 
 The consequence is that the program cannot pay a winner by writing to it. Solana permits a program to modify the lamports only of accounts it **owns**, and the vault's owner is the System Program. So every payout — a win, or an owner withdrawal — is a CPI to `system_instruction::transfer`, with the vault PDA signing for itself via `invoke_signed`.
 
@@ -135,4 +135,4 @@ The alternative — computing a dollar value and paying it out in one asset — 
 
 ## Settlement re-checks its own preconditions
 
-`settle_win` verifies the session is still pending and still inside its window, even though both claim paths already validated their proof. The proof establishes that the player *knew the secret* — not that they were still inside the clock when they proved it. Those are different claims, and conflating them is how a player wins a session they already lost.
+`settle_win` verifies the session is still pending and still inside its window, even though both claim paths already validated their proof. The proof establishes that the player _knew the secret_ — not that they were still inside the clock when they proved it. Those are different claims, and conflating them is how a player wins a session they already lost.

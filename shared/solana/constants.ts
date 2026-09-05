@@ -19,7 +19,11 @@ export const DEFAULT_RPC: Record<Cluster, string> = {
 }
 
 /** Explorer link helper — devnet and localnet need the `cluster` query param. */
-export function explorerUrl(signatureOrAddress: string, cluster: Cluster, kind: 'tx' | 'address' = 'tx'): string {
+export function explorerUrl(
+  signatureOrAddress: string,
+  cluster: Cluster,
+  kind: 'tx' | 'address' = 'tx',
+): string {
   const base = `https://explorer.solana.com/${kind}/${signatureOrAddress}`
   if (cluster === 'mainnet-beta') return base
   if (cluster === 'devnet') return `${base}?cluster=devnet`

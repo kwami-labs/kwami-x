@@ -8,7 +8,7 @@ The honest version of what trusts what.
 
 **Commit–reveal wins.** The program hashes the submitted pre-image and compares it to a commitment written at mint. Nothing off chain can deny a real win or fabricate a fake one.
 
-**Ticket escrow.** The vault is a system-owned PDA. Its lamport balance *is* the pot. Owner withdrawals are refused while a Kwami is live, so a pot cannot be drained mid-session.
+**Ticket escrow.** The vault is a system-owned PDA. Its lamport balance _is_ the pot. Owner withdrawals are refused while a Kwami is live, so a pot cannot be drained mid-session.
 
 **Scarcity.** `create_kwami` runs in the same transaction that revokes the NFT's mint authority. Without that, an author could mint a second copy of the same Kwami at any time and the scarcity claim would be worthless.
 
@@ -16,7 +16,7 @@ The honest version of what trusts what.
 
 **The secret store.** A plaintext secret must exist somewhere off chain — the voice agent cannot tell when a challenger has won without it. It is encrypted with AES-256-GCM under a key held only in the process environment, in a table with RLS enabled and **zero policies**, which denies everything that is not service role. A database dump alone is inert. Someone with both the dump and the process environment has every secret.
 
-**The match decision.** `matchSecret` runs server-side. A compromised server could refuse to acknowledge a genuine win. It could not *steal* the pot — it has no key that can claim — but it could stall.
+**The match decision.** `matchSecret` runs server-side. A compromised server could refuse to acknowledge a genuine win. It could not _steal_ the pot — it has no key that can claim — but it could stall.
 
 **The oracle, in attested mode.** A registered ed25519 key signs win certificates. A compromised oracle can forge wins on attested Kwamis. It has no authority to move funds directly, so the blast radius is forged wins, not a drained treasury. Commit–reveal Kwamis are unaffected. Owners choose per Kwami, at mint, and challengers can see which mode they are playing before paying.
 
@@ -32,7 +32,7 @@ Solana has no syscall to verify an ed25519 signature inside a program, so the ru
 
 ### Nonce replay
 
-Sign-in nonces are single-use and consumed *before* signature verification, so retries with one nonce cannot be used to grind at it. They live in Nitro storage, not process memory, because a serverless deployment must reject a replay on every instance, not just the one that issued it.
+Sign-in nonces are single-use and consumed _before_ signature verification, so retries with one nonce cannot be used to grind at it. They live in Nitro storage, not process memory, because a serverless deployment must reject a replay on every instance, not just the one that issued it.
 
 ### Domain binding
 

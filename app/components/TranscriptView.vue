@@ -34,7 +34,11 @@ function stamp(ms: number) {
 </template>
 
 <style scoped>
-.transcript { display: flex; flex-direction: column; gap: 9px; }
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
 
 .transcript__scroll {
   max-height: 280px;
@@ -45,9 +49,25 @@ function stamp(ms: number) {
   padding-right: 4px;
 }
 
-.turn { display: flex; gap: 10px; align-items: baseline; }
-.turn__time { font-size: 0.7rem; flex: none; }
-.turn__text { margin: 0; font-size: 0.9rem; line-height: 1.45; }
-.turn--player .turn__text { color: var(--fg); }
-.turn--kwami .turn__text { color: var(--accent); font-style: italic; }
+.turn {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.turn__time {
+  font-size: 0.7rem;
+  flex: none;
+}
+.turn__text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.turn--player .turn__text {
+  color: var(--fg);
+}
+.turn--kwami .turn__text {
+  color: var(--accent);
+  font-style: italic;
+}
 </style>

@@ -17,7 +17,13 @@ async function load() {
   loading.value = false
 }
 
-watch(() => auth.isSignedIn, (signedIn) => { if (signedIn) load() }, { immediate: true })
+watch(
+  () => auth.isSignedIn,
+  (signedIn) => {
+    if (signedIn) load()
+  },
+  { immediate: true },
+)
 
 function outcomeTone(outcome: string) {
   if (outcome === 'won') return 'gold'
@@ -49,7 +55,9 @@ function outcomeTone(outcome: string) {
         <div class="stack gap-1 histrow__num">
           <span class="eyebrow">Ticket</span>
           <span class="num">
-            {{ s.asset === 'SOL' ? formatSol(s.ticket_amount as number) : formatUsdc(s.ticket_amount as number) }}
+            {{
+              s.asset === 'SOL' ? formatSol(s.ticket_amount as number) : formatUsdc(s.ticket_amount as number)
+            }}
           </span>
         </div>
         <div class="stack gap-1 histrow__num">
@@ -66,7 +74,15 @@ function outcomeTone(outcome: string) {
 </template>
 
 <style scoped>
-.histrow { align-items: center; }
-.histrow__num { align-items: flex-end; text-align: right; min-width: 96px; }
-.histrow__num .num { font-size: 0.92rem; }
+.histrow {
+  align-items: center;
+}
+.histrow__num {
+  align-items: flex-end;
+  text-align: right;
+  min-width: 96px;
+}
+.histrow__num .num {
+  font-size: 0.92rem;
+}
 </style>

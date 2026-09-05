@@ -24,15 +24,15 @@ Everything that decides who gets paid happens on chain. The conversation happens
 
 ## What is in this repository
 
-| Path | What it is |
-|------|-----------|
-| `app/` | The Nuxt 4 application — pages, components, stores, the 3D renderer |
-| `server/` | Nitro API routes: auth, Kwami CRUD, sessions, the on-ramp, the program builder |
-| `shared/` | Pure domain logic shared by client, server and tests: game rules, secret matching, Solana encoding |
-| `programs/kwami-vault/` | The Anchor program. The ledger, the escrow and the settlement rules |
-| `supabase/migrations/` | Schema, row level security, read models |
-| `tests/` | Vitest — unit tests over the domain, integration tests over the app |
-| `docs/` | This documentation. Also served at `/docs` |
+| Path                    | What it is                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------- |
+| `app/`                  | The Nuxt 4 application — pages, components, stores, the 3D renderer                                |
+| `server/`               | Nitro API routes: auth, Kwami CRUD, sessions, the on-ramp, the program builder                     |
+| `shared/`               | Pure domain logic shared by client, server and tests: game rules, secret matching, Solana encoding |
+| `programs/kwami-vault/` | The Anchor program. The ledger, the escrow and the settlement rules                                |
+| `supabase/migrations/`  | Schema, row level security, read models                                                            |
+| `tests/`                | Vitest — unit tests over the domain, integration tests over the app                                |
+| `docs/`                 | This documentation. Also served at `/docs`                                                         |
 
 ## Start here
 

@@ -1,0 +1,29 @@
+name: Setup workspace
+description: Bun (from package.json packageManager) plus Node, with dependencies installed from a frozen lockfile.
+
+inputs:
+  install:
+    description: Install dependencies with a frozen lockfile.
+    default: 'true'
+  node:
+    description: Also set up Node. Needed by semantic-release, which is a Node tool.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: package.json
+
+    # semantic-release and commitlint are Node tools; the app itself runs on bun.
+    - if: inputs.node == 'true'
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: .node-version
+
+    - if: inputs.install == 'true'
+      shell: bash
+      # `--frozen-lockfile` is the point: a PR that edits package.json without regenerating
+      # bun.lock fails here rather than silently resolving something else in CI.
+      run: bun install --frozen-lockfile

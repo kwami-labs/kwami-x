@@ -62,7 +62,10 @@ export interface Payout {
  * Both assets are paid proportionally rather than converting between them, so
  * the program never needs a swap route or a price oracle to settle a win.
  */
-export function calculatePayout(balances: Pick<VaultBalances, 'lamports' | 'usdcBaseUnits'>, payoutBps: number): Payout {
+export function calculatePayout(
+  balances: Pick<VaultBalances, 'lamports' | 'usdcBaseUnits'>,
+  payoutBps: number,
+): Payout {
   return {
     lamports: applyBps(balances.lamports, payoutBps),
     usdcBaseUnits: applyBps(balances.usdcBaseUnits, payoutBps),
@@ -70,7 +73,10 @@ export function calculatePayout(balances: Pick<VaultBalances, 'lamports' | 'usdc
 }
 
 /** Vault value in USD given spot prices. */
-export function vaultUsd(balances: Pick<VaultBalances, 'lamports' | 'usdcBaseUnits'>, solUsd: number): number {
+export function vaultUsd(
+  balances: Pick<VaultBalances, 'lamports' | 'usdcBaseUnits'>,
+  solUsd: number,
+): number {
   const sol = Number(balances.lamports) / Number(LAMPORTS_PER_SOL)
   const usdc = Number(balances.usdcBaseUnits) / Number(USDC_BASE_UNITS)
   return sol * solUsd + usdc

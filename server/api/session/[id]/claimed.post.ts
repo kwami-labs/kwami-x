@@ -19,14 +19,11 @@ export default defineEventHandler(async (event) => {
   const { signature } = Body.parse(await readBody(event))
 
   const db = serviceClient()
-  const { data: session } = await db
-    .from('game_sessions')
-    .select('id, player_id')
-    .eq('id', id)
-    .maybeSingle()
+  const { data: session } = await db.from('game_sessions').select('id, player_id').eq('id', id).maybeSingle()
 
   if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session.' })
-  if (session.player_id !== user.id) throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
+  if (session.player_id !== user.id)
+    throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
 
   const tx = await connection().getTransaction(signature, {
     commitment: 'confirmed',

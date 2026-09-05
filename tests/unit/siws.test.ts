@@ -40,13 +40,21 @@ describe('formatSiwsMessage', () => {
 
 describe('parseSiwsMessage', () => {
   it('round-trips every field', () => {
-    const message: SiwsMessage = { ...BASE, expirationTime: '2026-09-04T12:05:00.000Z', resources: ['a', 'b'] }
+    const message: SiwsMessage = {
+      ...BASE,
+      expirationTime: '2026-09-04T12:05:00.000Z',
+      resources: ['a', 'b'],
+    }
     expect(parseSiwsMessage(formatSiwsMessage(message))).toEqual(message)
   })
 
   it('round-trips without optional fields', () => {
     const message: SiwsMessage = { ...BASE, statement: undefined }
-    expect(parseSiwsMessage(formatSiwsMessage(message))).toEqual({ ...message, expirationTime: undefined, resources: undefined })
+    expect(parseSiwsMessage(formatSiwsMessage(message))).toEqual({
+      ...message,
+      expirationTime: undefined,
+      resources: undefined,
+    })
   })
 
   it('recovers a multi-line statement intact', () => {
