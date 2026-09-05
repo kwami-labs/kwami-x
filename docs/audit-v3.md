@@ -7,7 +7,7 @@ uncertain. Only findings that survived appear here, each anchored to a file and 
 
 **20 blockers · 31 majors · 39 minors.**
 
-Two blockers have since been fixed — see [Fixed](#fixed). The rest stand.
+Nine blockers and two majors have since been fixed — see [Fixed](#fixed). The rest stand.
 
 ## Verdict
 
@@ -1232,16 +1232,55 @@ and withdraw authority over a Kwami they have sold.
 
 ## Fixed
 
-- **Sessions never ended.** The three-minute limit was enforced only against a
-  client-supplied timestamp, and nothing ever wrote a terminal outcome, so reporting `at: 0`
-  on every turn held a session open indefinitely — unlimited turns against the Kwami's brain
-  and unlimited reads of the similarity score returned on each miss.
-  Fixed in `server/utils/session-window.ts`; 11 tests.
-- **Every avatar rendered white.** `paletteFromMint` emitted CSS Color 4 space syntax that
-  three.js cannot parse, so `Color.setStyle` fell through to its default. Fixed in
-  `shared/game/palette.ts`; 5 tests, one of which parses the output with a real `THREE.Color`
-  and asserts it is not white. The previous test asserted the broken string shape, which is
-  why the bug survived a green suite.
+Nine blockers and two majors, each with the test that would have caught it.
+
+**The session never ended** — blockers 4, 5, 6 and 20. The three-minute limit was enforced only
+against a client-supplied `at`, and nothing anywhere wrote a terminal outcome, so `pending` was
+permanent and every `outcome !== 'pending'` guard was dead code. Reporting `at: 0` on each turn
+held a session open indefinitely: unlimited turns against the Kwami's brain, and unlimited reads
+of the similarity score returned on every miss — which together give up the phrase.
+`server/utils/session-window.ts` now closes the session on the server clock with a conditional
+write, and the LiveKit token is scoped to what is left of the session rather than a flat five
+minutes. 11 tests.
+
+_Still open from that cluster:_ a win returns the plaintext pre-image, which is replayable on a
+freshly bought ticket. That is a protocol design question, not a clock bug.
+
+**Every avatar rendered white** — blocker 17. `paletteFromMint` emitted CSS Color 4 space
+syntax; three.js's `Color.setStyle` matches only the comma form and fell through to its default.
+Demonstrated directly: `hsl(200 78% 62%)` parses to `#ffffff`. One definition now lives in
+`shared/game/palette.ts` instead of two copies. 5 tests, one parsing through a real
+`THREE.Color` — the previous test asserted the broken string shape, which is why the bug
+survived a green suite.
+
+**The oracle attestation was forgeable** — blocker 18. The three `*_instruction_index` fields
+tell the runtime which instruction to read the signature, key and message from, and
+`attestation.rs` never looked at them. An attacker could put the real oracle key and the real
+expected message inside the ed25519 instruction — passing every check the program made — while
+pointing the indices at another instruction holding their own key, message and a genuinely
+valid signature. All three must now be `u16::MAX`. Offsets are also overflow-checked and
+refused if they reach back into the header.
+
+**Any token bought a real session** — blocker 14, major 20. `start_session_usdc` took an
+unconstrained `Mint`, so a token printed by the player bought a ticket whose win paid out real
+SOL. The accepted mint is now `Config::usdc_mint`, pinned with `address =`. `treasury_usdc` and
+`author_usdc` were constrained only by mint, so a player could pass their own accounts and take
+the fee and royalty back; both are now bound to `config.treasury` and `kwami.author`.
+
+**An owner could drain a pot mid-challenge** — blocker 9, major 30. `pause` and `withdraw` are
+separate instructions and withdrawal only checked that the Kwami was not Live, so an owner could
+pause and empty the pot while a challenger who had paid still had time on the clock.
+`Kwami::pot_locked_until` holds the pot until the latest sold session expires, monotonically.
+
+**A seller kept the keys after the sale** — blocker 13. Withdrawal authorised on `kwami.owner`,
+a cached field refreshed only by `sync_owner`, which nothing ever called. Both handlers now
+require the NFT token account itself and write the proven holder back.
+
+**The program had no tests at all.** It has 28: the attestation verifier including every forgery
+variant, the 80% arithmetic checked against the TypeScript implementation it must agree with,
+ticket splits conserving every lamport, both death rules at their exact boundaries, and the
+pause-mid-session drain. Removing just the three index checks fails exactly three of them, so
+they are not vacuous.
 
 ## Suggested order of work
 
