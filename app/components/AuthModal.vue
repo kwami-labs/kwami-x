@@ -12,6 +12,8 @@
  * picks changes nothing downstream. Phantom leads because it is the only one
  * that is simultaneously an identity and a way to be paid.
  */
+import { isMobileBrowser, phantomDeeplink, PHANTOM_INSTALL_URL } from '~/utils/phantom'
+
 const auth = useAuthStore()
 const wallet = useWalletStore()
 
@@ -31,6 +33,7 @@ const notice = ref<string | null>(null)
 const busy = ref(false)
 
 const panel = useTemplateRef<HTMLElement>('panel')
+const mobile = isMobileBrowser()
 
 /** Anything that finished with a session in hand ends the same way. */
 function settled() {
@@ -53,6 +56,12 @@ async function guard(run: () => Promise<void>) {
 
 const onPhantom = () =>
   guard(async () => {
+    // On a phone without the in-app browser, there is no provider to talk to —
+    // send them into Phantom rather than showing "not installed".
+    if (wallet.status === 'unavailable' && mobile) {
+      window.location.href = phantomDeeplink()
+      return
+    }
     await auth.signInWithPhantom()
     settled()
   })
@@ -166,9 +175,16 @@ onKeyStroke('Escape', () => {
           only; every pot settles on Solana, so you will be asked for a Phantom wallet before any money moves.
         </p>
         <p v-if="wallet.status === 'unavailable'" class="hint">
-          No Phantom detected.
-          <a href="https://phantom.app/download" target="_blank" rel="noopener" class="linkish">Install it</a>
-          — or use email below.
+          <template v-if="mobile">
+            Open this page in
+            <a :href="phantomDeeplink()" class="linkish">Phantom</a>
+            to sign in with your wallet — or use email below.
+          </template>
+          <template v-else>
+            No Phantom detected.
+            <a :href="PHANTOM_INSTALL_URL" target="_blank" rel="noopener" class="linkish">Install it</a>
+            — or use email below.
+          </template>
         </p>
       </div>
 
