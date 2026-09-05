@@ -1,6 +1,19 @@
-import { describe, expect, it } from 'vitest'
-import { DEMO_KWAMIS } from '~~/server/utils/demo'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { evaluateDeath, vaultUsd, vitality } from '#shared/game/economy'
+
+const config = {
+  public: { supabaseUrl: 'https://your-project.supabase.co' },
+  supabaseServiceKey: 'sk_test_...',
+}
+
+vi.stubGlobal('useRuntimeConfig', () => config)
+vi.stubGlobal('createError', (opts: { statusCode: number; statusMessage: string }) => {
+  const error = new Error(opts.statusMessage) as Error & { statusCode: number }
+  error.statusCode = opts.statusCode
+  return error
+})
+
+const { DEMO_KWAMIS, demoSessions, isDemoMode, assertNotDemo } = await import('~~/server/utils/demo')
 
 /**
  * The demo dataset is what a fresh clone shows before any infrastructure
@@ -51,7 +64,7 @@ describe('demo dataset', () => {
     }
   })
 
-  it('includes at least one dead Kwami, so the state is visible in the arena', () => {
+  it('includes at least one dead Kwami, so the arena shows the state', () => {
     expect(DEMO_KWAMIS.some((k) => k.state === 'dead')).toBe(true)
   })
 
@@ -63,5 +76,67 @@ describe('demo dataset', () => {
 
   it('uses distinct mints, since they key every lookup and colour palette', () => {
     expect(new Set(DEMO_KWAMIS.map((k) => k.mint)).size).toBe(DEMO_KWAMIS.length)
+  })
+})
+
+describe('demoSessions', () => {
+  it('never invents more rows than the Kwami has played', () => {
+    const k = DEMO_KWAMIS.find((d) => d.sessions_played > 0)!
+    expect(demoSessions(k).length).toBe(Math.min(k.sessions_played, 12))
+    expect(demoSessions(k, 3).length).toBe(Math.min(k.sessions_played, 3))
+  })
+
+  it('places wins first and keeps their count honest', () => {
+    const k = DEMO_KWAMIS.find((d) => d.sessions_won > 0)!
+    const sessions = demoSessions(k)
+    const wins = sessions.filter((s) => s.outcome === 'won')
+    expect(wins.length).toBe(Math.min(k.sessions_won, sessions.length))
+    expect(sessions.slice(0, wins.length).every((s) => s.outcome === 'won')).toBe(true)
+  })
+
+  it('pays out only on wins, in the Kwami prize amounts', () => {
+    const k = DEMO_KWAMIS.find((d) => d.sessions_won > 0)!
+    for (const s of demoSessions(k)) {
+      if (s.outcome === 'won') {
+        expect(s.payout_lamports).toBe(k.prize_lamports)
+        expect(s.payout_usdc).toBe(k.prize_usdc)
+        expect(s.tx_claim).toBeTruthy()
+      } else {
+        expect(s.payout_lamports + s.payout_usdc).toBe(0)
+        expect(s.tx_claim).toBeNull()
+      }
+    }
+  })
+
+  it('is deterministic for a given mint', () => {
+    const k = DEMO_KWAMIS[0]!
+    expect(demoSessions(k)).toEqual(demoSessions(k))
+  })
+})
+
+describe('isDemoMode / assertNotDemo', () => {
+  beforeEach(() => {
+    config.public.supabaseUrl = 'https://your-project.supabase.co'
+    config.supabaseServiceKey = 'sk_test_...'
+  })
+
+  it('treats .env.example placeholders as demo mode', () => {
+    expect(isDemoMode()).toBe(true)
+  })
+
+  it('leaves demo mode once both credentials look real', () => {
+    config.public.supabaseUrl = 'https://abcdefgh.supabase.co'
+    config.supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'
+    expect(isDemoMode()).toBe(false)
+  })
+
+  it('blocks writes while demo mode is on', () => {
+    expect(() => assertNotDemo()).toThrow(/demo mode/i)
+  })
+
+  it('allows writes once credentials are real', () => {
+    config.public.supabaseUrl = 'https://abcdefgh.supabase.co'
+    config.supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'
+    expect(() => assertNotDemo()).not.toThrow()
   })
 })
