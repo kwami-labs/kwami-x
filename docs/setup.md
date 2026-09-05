@@ -63,6 +63,12 @@ NUXT_PUBLIC_SOLANA_CLUSTER=localnet
 NUXT_PUBLIC_SOLANA_RPC_URL=http://127.0.0.1:8899
 NUXT_PUBLIC_KWAMI_PROGRAM_ID=<from anchor deploy>
 NUXT_ORACLE_SECRET_KEY=<base58 secret key>
+
+# Where the flat mint commission is paid, and how much it is. An empty treasury
+# adds no commission instruction at all, so a devnet clone can mint without
+# first inventing an address to pay.
+NUXT_PUBLIC_PLATFORM_TREASURY=<base58 address>
+NUXT_PUBLIC_MINT_COMMISSION_SOL=0.5
 ```
 
 The bootstrap script creates the protocol config account, a USDC-like mint and a funded treasury.

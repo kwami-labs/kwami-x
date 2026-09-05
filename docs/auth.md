@@ -11,6 +11,54 @@ Six ways in. All six produce the same `auth.users` row shape, so nothing downstr
 | **Phantom**      | Custom (SIWS)  | **Yes**                         |
 | MetaMask         | Custom (SIWE)  | No — identity only              |
 
+## The gate
+
+Signing in happens in a glass panel over a live field of drifting Kwamis, not on a page of its
+own. The Kwamis are the product; the form is the toll. Rendering it as an overlay also means
+there is no navigation to undo afterwards — dismissing the panel reveals the arena that was
+already loading behind it.
+
+The panel is dismissible on the pages that only _show_ things (`/`, `/kwami/…`,
+`/leaderboard`), so a shared link to a specific Kwami is readable before anyone is asked for an
+account. It is not dismissible on the pages that move money or write state, which have nothing
+to show a visitor who cannot do either. `/docs`, `/embed` and `/auth/callback` are never gated:
+the first is documentation, the second renders on other people's sites, and gating the third
+would deadlock the flow that produces the session.
+
+With no Supabase project configured the gate does not appear at all. Demo mode makes every
+sign-in method fail by design, and a locked door with no key is worse than an open one — the
+check is `isConfigured` from `shared/config/`, the _same_ placeholder-aware test the server uses
+to decide demo mode, because the two disagreeing produced exactly that locked door.
+
+## Binding a wallet to an account {#binding}
+
+Signing in with Phantom proves an address as a side effect. The other five methods do not, so
+connecting a wallet afterwards posts a fresh SIWS signature to `/api/me/wallet`, which verifies
+it through the same `verifySignedSiws` the sign-in route uses and writes `wallet_identities`.
+
+Two things follow from that shared verifier. A browser can never bind an address it cannot sign
+for — the claim is worth nothing on its own when the reward for lying is another user's payouts
+landing in your wallet. And an address already bound elsewhere is **refused**, not moved:
+silently re-pointing it would let anyone holding the private key take over the payout
+destination of an account they do not otherwise control.
+
+The already-bound check runs first and costs one GET, because the alternative is a wallet popup
+on every page load for someone who bound the same address last week — and a prompt with nothing
+to approve is how users learn to click through prompts without reading them.
+
+### Nitro cannot see the browser's session
+
+Supabase keeps the session in local storage, which is what lets it refresh tokens without a
+round trip — and means nothing is sent automatically. Every route behind `requireUser` answers
+401 to a plain `$fetch`.
+
+The wallet path sets a cookie, which is why it appeared to work while the other four did not:
+email, phone, Google and GitHub could sign in perfectly and then fail at the first thing the
+account was for. `app/utils/api.ts` attaches the bearer token to same-origin `/api/` requests,
+and `useApi()` is what every authenticated call site uses. It is scoped to same-origin paths on
+purpose: a token is a bearer credential, and must never ride along to a third-party host because
+a URL happened to be passed in.
+
 ## Wallet sign-in
 
 Supabase has no wallet provider, so Phantom and MetaMask go through `/api/auth/*`, which verifies a signature and mints a real Supabase session.

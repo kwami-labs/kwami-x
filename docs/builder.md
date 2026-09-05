@@ -37,6 +37,37 @@ The rules:
 6. No unbounded loops, no unbounded `Vec` growth, no dynamic account allocation inside a hook.
 7. No upgrade authority after deploy, or the immutability a Kwami advertises is a fiction.
 
+### The response is a stream
+
+A generation takes a minute or more and spends most of it reasoning before the first line of Rust
+exists. A route that waited and answered once would show a spinner for that whole minute — and a
+spinner cannot be told apart from a hang, so the honest reading of it is "this is broken".
+
+`/api/builder/generate` streams instead: the model's summarised reasoning, then the source, as
+they arrive. `shared/codegen/` holds the vocabulary both ends speak — `config.ts` for the model
+allow-list and the thinking configuration, `activity.ts` for the wire format — so the browser
+transport and the Nitro route cannot drift into a request the API rejects with a 400 the owner
+reads as a broken builder. The structure mirrors the codegen split used in nexow: a contract
+module both ends import, a route that owns the API key, and a client that owns the rendering.
+
+The format is newline-delimited JSON, not `text/event-stream`. SSE frames are delimited by a
+blank line and the payload here is Rust source _with blank lines in it_, so every empty line in a
+generated program would have to be escaped or would silently split a frame. JSON escapes newlines
+for free.
+
+Two details that only matter once something goes wrong:
+
+- **`display: 'summarized'`.** The adaptive models default to `omitted`, which streams _empty_
+  thinking blocks — the model reasons for thirty seconds and the UI has nothing to show. That is
+  the failure the stream exists to prevent, so the config asks for summaries explicitly.
+- **Failures travel in the stream.** A streaming route answers 200 the moment it opens, so an
+  upstream failure after that has no status code left to travel in. Without an explicit `error`
+  record the browser cannot distinguish "the model finished" from "the connection died before it
+  said anything" — and that difference decides whether the owner should retry.
+
+The API key never leaves the server, which is the whole reason this is a route rather than a
+direct call from the builder page.
+
 ## The model writes it; a human deploys it
 
 That separation is not a limitation waiting to be engineered away. A generated program that moves other people's money should be read by its owner before it goes near a cluster.
