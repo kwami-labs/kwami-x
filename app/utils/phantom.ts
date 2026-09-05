@@ -61,7 +61,7 @@ export function normalizeSignInOutput(out: PhantomSignInOutput): {
   let address: string | null = null
   if (typeof out.address === 'string' && out.address.length > 0) {
     address = out.address
-  } else if (out.address && typeof out.address.toBase58 === 'function') {
+  } else if (out.address instanceof PublicKey) {
     address = out.address.toBase58()
   } else if (typeof out.account?.address === 'string' && out.account.address.length > 0) {
     address = out.account.address
