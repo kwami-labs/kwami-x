@@ -42,6 +42,10 @@ async function act(action: 'publish' | 'pause') {
     const sig = await wallet.signAndSend(tx)
     await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed')
     signature.value = sig
+    // The chain is now authoritative; tell the index to catch up. Without this the Kwami is
+    // Live on chain and still `minted` in the database, so the arena never lists it and every
+    // ticket is refused — publishing appeared to work and changed nothing.
+    await $fetch(`/api/kwami/${kwami.value.mint}/sync`, { method: 'POST' })
     await refresh()
   } catch (e) {
     error.value = describeWalletError(e)
