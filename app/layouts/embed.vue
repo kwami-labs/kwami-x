@@ -17,8 +17,12 @@
 <style>
 /* Global rather than scoped: the ambient body gradient has to go too, or it
    shows through as a purple haze inside the host's iframe. */
-body:has(.embed-shell) { background: transparent; }
-body:has(.embed-shell)::before { display: none; }
+body:has(.embed-shell) {
+  background: transparent;
+}
+body:has(.embed-shell)::before {
+  display: none;
+}
 </style>
 
 <style scoped>

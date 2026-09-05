@@ -32,7 +32,7 @@ const idle = ref(0)
 let raf = 0
 onMounted(() => {
   const loop = () => {
-    idle.value = (Math.sin(Date.now() / 1400) + 1) / 2 * 0.16
+    idle.value = ((Math.sin(Date.now() / 1400) + 1) / 2) * 0.16
     raf = requestAnimationFrame(loop)
   }
   raf = requestAnimationFrame(loop)
@@ -81,7 +81,10 @@ const href = computed(() => `${useRuntimeConfig().public.siteUrl}/kwami/${mint.v
 .embed--missing {
   display: grid;
   place-items: center;
-  font: 13px/1.4 ui-sans-serif, system-ui, sans-serif;
+  font:
+    13px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
   color: #888;
 }
 
@@ -95,13 +98,22 @@ const href = computed(() => `${useRuntimeConfig().public.siteUrl}/kwami/${mint.v
   justify-content: space-between;
   gap: 10px;
   padding: 10px 12px;
-  font: 12px/1.35 ui-sans-serif, system-ui, sans-serif;
+  font:
+    12px/1.35 ui-sans-serif,
+    system-ui,
+    sans-serif;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
   color: #fff;
 }
 
-.embed__meta { display: flex; flex-direction: column; }
-.embed__pot { opacity: 0.72; font-variant-numeric: tabular-nums; }
+.embed__meta {
+  display: flex;
+  flex-direction: column;
+}
+.embed__pot {
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+}
 
 .embed__cta {
   flex: none;

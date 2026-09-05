@@ -34,19 +34,19 @@ Same shape, EIP-4361 message and a `0x`-prefixed 65-byte signature.
 
 ### `GET /api/kwami`
 
-| Query | Default | Values |
-|---|---|---|
-| `state` | `live` | `live` `paused` `cracked` `dead` `all` |
-| `sort` | `pot` | `pot` `new` `contested` |
-| `limit` | 24 | 1–60 |
-| `offset` | 0 | |
-| `owner` | — | filter by owner wallet |
+| Query    | Default | Values                                 |
+| -------- | ------- | -------------------------------------- |
+| `state`  | `live`  | `live` `paused` `cracked` `dead` `all` |
+| `sort`   | `pot`   | `pot` `new` `contested`                |
+| `limit`  | 24      | 1–60                                   |
+| `offset` | 0       |                                        |
+| `owner`  | —       | filter by owner wallet                 |
 
 ```json
 ← { "demo": false, "kwamis": [...], "totals": { "pot": 0, "live": 0, "sessions": 0 } }
 ```
 
-Totals are computed over *all* live Kwamis, not the returned page, so they stay put while someone scrolls.
+Totals are computed over _all_ live Kwamis, not the returned page, so they stay put while someone scrolls.
 
 ### `GET /api/kwami/:mint`
 
@@ -112,7 +112,7 @@ A win is the **only** circumstance under which claim material leaves the server.
 
 ### `POST /api/session/:id/reply` — auth, player only
 
-Asks the Kwami to answer. Runs server-side because the persona prompt contains the secret — the model needs it to steer *around* it.
+Asks the Kwami to answer. Runs server-side because the persona prompt contains the secret — the model needs it to steer _around_ it.
 
 ### `POST /api/session/:id/voice-token` — auth, player only
 

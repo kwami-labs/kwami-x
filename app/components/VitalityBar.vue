@@ -32,7 +32,11 @@ const tone = computed(() => {
 </template>
 
 <style scoped>
-.vitality { display: flex; flex-direction: column; gap: 5px; }
+.vitality {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 
 .vitality__track {
   height: 4px;
@@ -47,14 +51,28 @@ const tone = computed(() => {
   transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.vitality__fill--well { background: linear-gradient(90deg, var(--accent), var(--success)); }
-.vitality__fill--weak { background: linear-gradient(90deg, var(--warn), var(--gold)); }
-.vitality__fill--dying { background: var(--danger); animation: flicker 1.6s ease-in-out infinite; }
+.vitality__fill--well {
+  background: linear-gradient(90deg, var(--accent), var(--success));
+}
+.vitality__fill--weak {
+  background: linear-gradient(90deg, var(--warn), var(--gold));
+}
+.vitality__fill--dying {
+  background: var(--danger);
+  animation: flicker 1.6s ease-in-out infinite;
+}
 
-.vitality__label { font-size: 0.74rem; }
+.vitality__label {
+  font-size: 0.74rem;
+}
 
 @keyframes flicker {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 </style>

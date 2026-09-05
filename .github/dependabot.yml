@@ -1,12 +1,56 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
 version: 2
-updates:
-  - package-ecosystem: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
-    schedule:
-      interval: "weekly"
 
+updates:
+  # Release, promotion and program-build logic all live in pinned actions.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # `ci:` releases nothing — a workflow bump should not cut a version.
+    commit-message:
+      prefix: ci
+    labels: [dependencies]
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: bun
+    directory: /
+    # Dependabot opens against the default branch; `dev` is where the promote path starts.
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: build
+      prefix-development: chore
+      include: scope
+    labels: [dependencies]
+    groups:
+      nuxt:
+        patterns: ['nuxt', '@nuxt/*', 'vue', 'vue-router', 'vue-tsc', '@vue/*']
+      solana:
+        patterns: ['@solana/*', '@noble/*', 'bs58']
+      testing:
+        patterns: ['vitest', '@vitest/*', 'happy-dom', '@vue/test-utils']
+      release-tooling:
+        patterns: ['semantic-release', '@semantic-release/*', '@commitlint/*', 'husky', 'lint-staged']
+      minor-and-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # The vault program. An anchor-lang bump changes the code that custodies user funds, so it
+  # gets the `program` scope that .releaserc.cjs always releases on.
+  - package-ecosystem: cargo
+    directory: /programs
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'build(program)'
+    labels: [dependencies, solana]

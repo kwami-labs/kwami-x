@@ -18,7 +18,7 @@ useSeoMeta({
       <div class="hero__copy stack gap-3">
         <span class="eyebrow">Solana · voice · winner takes 80%</span>
         <h1>
-          Every Kwami is<br >
+          Every Kwami is<br />
           hiding one phrase.
         </h1>
         <p class="hero__lede muted">
@@ -37,7 +37,7 @@ useSeoMeta({
           <span class="eyebrow">Total pots</span>
           <span class="num num--xl gold">{{ formatCents(totals.pot) }}</span>
         </div>
-        <hr class="divider" >
+        <hr class="divider" />
         <div class="row gap-4">
           <div class="stat">
             <span class="eyebrow">Live</span>
@@ -109,8 +109,13 @@ useSeoMeta({
   padding-block: 28px 12px;
 }
 
-.hero__lede { max-width: 52ch; font-size: 1.05rem; }
-.hero__cta { flex-wrap: wrap; }
+.hero__lede {
+  max-width: 52ch;
+  font-size: 1.05rem;
+}
+.hero__cta {
+  flex-wrap: wrap;
+}
 
 .hero__stats {
   display: flex;
@@ -118,7 +123,11 @@ useSeoMeta({
   gap: 18px;
 }
 
-.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
 .rules__list {
   list-style: none;
@@ -129,9 +138,19 @@ useSeoMeta({
   gap: 26px;
 }
 
-.rules__list li { display: flex; gap: 13px; align-items: flex-start; }
-.rules__list strong { display: block; margin-bottom: 3px; }
-.rules__list p { font-size: 0.9rem; margin: 0; }
+.rules__list li {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+}
+.rules__list strong {
+  display: block;
+  margin-bottom: 3px;
+}
+.rules__list p {
+  font-size: 0.9rem;
+  margin: 0;
+}
 
 .rules__n {
   flex: none;
@@ -164,10 +183,14 @@ useSeoMeta({
 }
 
 @keyframes shimmer {
-  to { background-position: -220% 0; }
+  to {
+    background-position: -220% 0;
+  }
 }
 
 @media (max-width: 880px) {
-  .hero { grid-template-columns: 1fr; }
+  .hero {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

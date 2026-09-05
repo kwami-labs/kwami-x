@@ -87,8 +87,9 @@ async function copySource() {
       <span class="eyebrow">Program builder</span>
       <h1>Give {{ kwami?.name ?? 'your Kwami' }} its own rules.</h1>
       <p class="muted builder__lede">
-        Describe a game in plain language and get an Anchor program that the vault will call at each lifecycle moment.
-        You read it, you deploy it, you attach it. After that it is as immutable as everything else about this Kwami.
+        Describe a game in plain language and get an Anchor program that the vault will call at each lifecycle
+        moment. You read it, you deploy it, you attach it. After that it is as immutable as everything else
+        about this Kwami.
       </p>
     </header>
 
@@ -98,13 +99,15 @@ async function copySource() {
           <div class="field">
             <span class="label">Start from</span>
             <div class="chips">
-              <button v-for="e in examples" :key="e.label" class="chip" @click="loadExample(e)">{{ e.label }}</button>
+              <button v-for="e in examples" :key="e.label" class="chip" @click="loadExample(e)">
+                {{ e.label }}
+              </button>
             </div>
           </div>
 
           <div class="field">
             <label class="label" for="pname">Name</label>
-            <input id="pname" v-model="name" class="input" placeholder="Escalating ticket" maxlength="64" >
+            <input id="pname" v-model="name" class="input" placeholder="Escalating ticket" maxlength="64" />
           </div>
 
           <div class="field">
@@ -116,7 +119,9 @@ async function copySource() {
               rows="6"
               placeholder="Every time a challenger fails, the next ticket costs 8% more…"
             />
-            <span class="hint">Be specific about numbers and edge cases. Vague briefs produce plausible, wrong code.</span>
+            <span class="hint"
+              >Be specific about numbers and edge cases. Vague briefs produce plausible, wrong code.</span
+            >
           </div>
 
           <div class="field">
@@ -151,9 +156,9 @@ async function copySource() {
             <li v-for="rule in EXTENSION_RULES" :key="rule">{{ rule }}</li>
           </ul>
           <p class="hint">
-            These constraints are sent to the model and listed here so you are checking the same list it was given.
-            Read the code before you deploy it — the vault stops a bad extension from draining the pot, but it cannot
-            stop one from breaking your own game.
+            These constraints are sent to the model and listed here so you are checking the same list it was
+            given. Read the code before you deploy it — the vault stops a bad extension from draining the pot,
+            but it cannot stop one from breaking your own game.
           </p>
         </div>
       </section>
@@ -165,13 +170,18 @@ async function copySource() {
         <div v-else class="card output">
           <div class="row gap-2 output__bar">
             <span class="eyebrow grow">lib.rs</span>
-            <button class="btn btn--sm btn--ghost" @click="copySource">{{ copied ? 'Copied' : 'Copy' }}</button>
+            <button class="btn btn--sm btn--ghost" @click="copySource">
+              {{ copied ? 'Copied' : 'Copy' }}
+            </button>
           </div>
           <pre class="output__code"><code>{{ source }}</code></pre>
           <div class="output__next stack gap-2">
             <h3>Next</h3>
             <ol class="steps dim">
-              <li>Drop this into <code class="num">programs/</code> and run <code class="num">anchor build</code>.</li>
+              <li>
+                Drop this into <code class="num">programs/</code> and run
+                <code class="num">anchor build</code>.
+              </li>
               <li>Deploy it, then remove its upgrade authority.</li>
               <li>Register it against this Kwami with <code class="num">register_extension</code>.</li>
               <li>Publish. The rules are fixed from that moment.</li>
@@ -184,8 +194,14 @@ async function copySource() {
 </template>
 
 <style scoped>
-.builder { display: flex; flex-direction: column; gap: 26px; }
-.builder__lede { max-width: 64ch; }
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.builder__lede {
+  max-width: 64ch;
+}
 
 .builder__grid {
   display: grid;
@@ -194,7 +210,11 @@ async function copySource() {
   align-items: start;
 }
 
-.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
 
 .chip {
   padding: 5px 12px;
@@ -204,9 +224,15 @@ async function copySource() {
   cursor: pointer;
   font-size: 0.84rem;
 }
-.chip:hover { border-color: var(--border-strong); }
+.chip:hover {
+  border-color: var(--border-strong);
+}
 
-.hooks { display: flex; flex-direction: column; gap: 7px; }
+.hooks {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
 
 .hook {
   display: flex;
@@ -221,14 +247,36 @@ async function copySource() {
   font-size: 0.82rem;
 }
 
-.hook--on { border-color: var(--accent-line); background: var(--accent-soft); }
-.hook strong { font-size: 0.85rem; }
+.hook--on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.hook strong {
+  font-size: 0.85rem;
+}
 
-.rules { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--fg-muted); }
+.rules {
+  margin: 0;
+  padding-left: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
 
-.output { padding: 0; overflow: hidden; }
-.output--empty { padding: 60px 24px; text-align: center; }
-.output__bar { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.output {
+  padding: 0;
+  overflow: hidden;
+}
+.output--empty {
+  padding: 60px 24px;
+  text-align: center;
+}
+.output__bar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
 
 .output__code {
   margin: 0;
@@ -241,10 +289,22 @@ async function copySource() {
   color: var(--fg-muted);
 }
 
-.output__next { padding: 16px; border-top: 1px solid var(--border); }
-.steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; }
+.output__next {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+.steps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.85rem;
+}
 
 @media (max-width: 1020px) {
-  .builder__grid { grid-template-columns: 1fr; }
+  .builder__grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -40,8 +40,8 @@ onMounted(async () => {
           Your balance is now {{ wallet.sol.toFixed(3) }} SOL and {{ wallet.usdc.toFixed(2) }} USDC.
         </template>
         <template v-else-if="attempts >= 20">
-          Card purchases usually settle within a few minutes, sometimes longer. It will appear in your wallet on its
-          own — nothing here needs to stay open.
+          Card purchases usually settle within a few minutes, sometimes longer. It will appear in your wallet
+          on its own — nothing here needs to stay open.
         </template>
         <template v-else>
           MoonPay is settling the purchase. This page is watching your wallet and will say so when it arrives.
@@ -57,5 +57,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.done { max-width: 480px; }
+.done {
+  max-width: 480px;
+}
 </style>

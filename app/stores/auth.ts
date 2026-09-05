@@ -164,7 +164,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       const { nonce } = await $fetch<{ nonce: string }>('/api/auth/nonce', {
         method: 'POST',
-        body: { },
+        body: {},
       })
 
       const { formatSiweMessage, SIWE_STATEMENT } = await import('#shared/auth/siwe')

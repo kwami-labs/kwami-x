@@ -42,15 +42,15 @@ describe('PDA derivation', () => {
 
   it('separates sessions by player', () => {
     const other = new PublicKey('So11111111111111111111111111111111111111112')
-    expect(findSessionPda(MINT, PLAYER, 0)[0].toBase58()).not.toBe(findSessionPda(MINT, other, 0)[0].toBase58())
+    expect(findSessionPda(MINT, PLAYER, 0)[0].toBase58()).not.toBe(
+      findSessionPda(MINT, other, 0)[0].toBase58(),
+    )
   })
 
   it('encodes the nonce as little-endian u64, matching the Rust seed', () => {
     // A big-endian encoding would produce a valid-looking address that the
     // program's seed constraint then rejects — an opaque failure at runtime.
-    expect(findSessionPda(MINT, PLAYER, 1)[0].toBase58()).toBe(
-      findSessionPda(MINT, PLAYER, 1n)[0].toBase58(),
-    )
+    expect(findSessionPda(MINT, PLAYER, 1)[0].toBase58()).toBe(findSessionPda(MINT, PLAYER, 1n)[0].toBase58())
   })
 
   it('returns a usable bump', () => {

@@ -72,7 +72,10 @@ describe('splitTicket', () => {
 
 describe('calculatePayout', () => {
   it('pays the same share of both assets', () => {
-    const payout = calculatePayout({ lamports: 1_000_000_000n, usdcBaseUnits: 500_000_000n }, DEFAULT_PAYOUT_BPS)
+    const payout = calculatePayout(
+      { lamports: 1_000_000_000n, usdcBaseUnits: 500_000_000n },
+      DEFAULT_PAYOUT_BPS,
+    )
     expect(payout.lamports).toBe(800_000_000n)
     expect(payout.usdcBaseUnits).toBe(400_000_000n)
   })
