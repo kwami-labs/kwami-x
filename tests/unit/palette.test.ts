@@ -1,6 +1,6 @@
 import { Color } from 'three'
 import { describe, expect, it } from 'vitest'
-import { paletteFromMint } from '../../shared/game/palette'
+import { paletteFromMint } from '#shared/kwami/appearance'
 
 const MINTS = [
   'DoQubWtmNa4WZTLWxe1iptCDrwf81M8LHDrZDP7pEBbL',
@@ -48,21 +48,11 @@ describe('paletteFromMint', () => {
     }
   })
 
-  it('emits the comma form both CSS and three.js understand', () => {
+  it('emits hex, which every consumer reads identically', () => {
     const { a, b } = paletteFromMint(MINTS[0])
 
     for (const style of [a, b]) {
-      expect(style).toMatch(/^hsl\(\d{1,3}, \d{1,3}%, \d{1,3}%\)$/)
-    }
-  })
-
-  it('keeps hues inside the legal range', () => {
-    for (const mint of MINTS) {
-      for (const style of Object.values(paletteFromMint(mint))) {
-        const hue = Number(/^hsl\((\d+),/.exec(style)![1])
-        expect(hue).toBeGreaterThanOrEqual(0)
-        expect(hue).toBeLessThan(360)
-      }
+      expect(style).toMatch(/^#[0-9a-f]{6}$/)
     }
   })
 })

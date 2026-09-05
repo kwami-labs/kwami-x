@@ -8,6 +8,8 @@
  * infrastructure exists, not to let someone believe they minted something.
  */
 
+import { isConfigured } from '#shared/config/configured'
+
 export interface DemoKwami {
   id: string
   mint: string
@@ -16,6 +18,7 @@ export interface DemoKwami {
   tagline: string
   persona: string
   renderer: string
+  appearance: Record<string, unknown>
   hints: string[]
   state: string
   resolution_mode: string
@@ -55,6 +58,7 @@ function build(
     id: partial.mint,
     vault: `vault${partial.mint.slice(0, 38)}`,
     persona: '',
+    appearance: {},
     hints: [],
     state: 'live',
     resolution_mode: 'commit-reveal',
@@ -84,6 +88,7 @@ function build(
 export const DEMO_KWAMIS: DemoKwami[] = [
   build({
     mint: 'Kw1Ora111111111111111111111111111111111111111',
+    appearance: { colorA: '#7c5cff', colorB: '#3ddc97' },
     name: 'Oracle of Small Talk',
     tagline: 'It will discuss the weather for three minutes straight if you let it.',
     persona: 'Deflects every direct question with pleasant small talk. Never lies, but never volunteers.',
@@ -96,6 +101,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
   }),
   build({
     mint: 'Kw2Vlt111111111111111111111111111111111111111',
+    appearance: { colorA: '#7ee7ff', colorB: '#e6f1ff' },
     name: 'The Vault Keeper',
     tagline: 'Answers only in questions. Has never once been beaten.',
     persona: 'Socratic and cold. Answers questions with questions. Treats every challenger as a student.',
@@ -109,6 +115,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
   }),
   build({
     mint: 'Kw3Shr111111111111111111111111111111111111111',
+    appearance: { colorA: '#ff5cb8', colorB: '#a77bff' },
     name: 'Shardsong',
     tagline: 'Sings when it is nervous. It is nervous a lot.',
     persona: 'Anxious, musical, over-shares about everything except the one thing that matters.',
@@ -122,6 +129,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
   }),
   build({
     mint: 'Kw4Gen111111111111111111111111111111111111111',
+    appearance: { colorA: '#f5c451', colorB: '#ff9d3d' },
     name: 'First Light',
     tagline: 'The first Kwami. Down to its last breath.',
     persona: 'Ancient and tired. Speaks in fragments. Wants to be beaten but cannot say so.',
@@ -136,6 +144,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
   }),
   build({
     mint: 'Kw5Hzn111111111111111111111111111111111111111',
+    appearance: { colorA: '#1f6feb', colorB: '#00d4ff' },
     name: 'Event Horizon',
     tagline: 'Nothing you say comes back out.',
     persona: 'Answers in single words. Hostile. Rewards persistence, punishes flattery.',
@@ -148,6 +157,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
   }),
   build({
     mint: 'Kw6Ash111111111111111111111111111111111111111',
+    appearance: { colorA: '#8b93a7', colorB: '#dfe4ef' },
     name: 'Ashfall',
     tagline: 'Beaten twice in one week. Never recovered.',
     persona: 'Bitter and brittle.',
@@ -161,17 +171,68 @@ export const DEMO_KWAMIS: DemoKwami[] = [
 ]
 
 /**
- * Placeholder values that mean "not configured yet".
+ * A plausible activity ledger for a demo Kwami.
  *
- * `.env.example` ships with illustrative values, and the overwhelmingly common
- * first run is `cp .env.example .env` followed by starting the server. Treating
- * those literal placeholders as real credentials produces a `fetch failed`
- * against `your-project.supabase.co`, which is a far worse first impression
- * than the demo arena.
+ * Derived from the Kwami's own counters rather than hard-coded, so a demo
+ * profile claiming "132 tried, 0 won" cannot show a feed with a win in it. The
+ * inconsistency would be the first thing anyone evaluating this noticed.
+ *
+ * Deterministic for the same mint: a demo page that reshuffles its own history
+ * on every refresh reads as broken rather than as sample data.
  */
-function isConfigured(value: unknown): boolean {
-  if (typeof value !== 'string' || value.trim() === '') return false
-  return !/your-project|your-server|\.{3}$|^(sk|pk|sb)_(test|publishable|secret)_\.{3}$/.test(value)
+export interface DemoSession {
+  id: string
+  outcome: 'won' | 'lost' | 'expired'
+  asset: 'SOL' | 'USDC'
+  ticket_amount: number
+  started_at: string
+  payout_lamports: number
+  payout_usdc: number
+  player_wallet: string
+  tx_start: string | null
+  tx_claim: string | null
+}
+
+/** base58 has no 0, O, I or l — a fake signature has to avoid them to look real. */
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+function pseudoBase58(seed: string, length: number): string {
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+  let out = ''
+  for (let i = 0; i < length; i++) {
+    // A 32-bit LCG. Not random in any meaningful sense; it only has to be
+    // stable and to look like an address rather than a repeating pattern.
+    hash = (hash * 1_664_525 + 1_013_904_223) >>> 0
+    out += B58[hash % B58.length]
+  }
+  return out
+}
+
+export function demoSessions(kwami: DemoKwami, limit = 12): DemoSession[] {
+  const total = Math.min(kwami.sessions_played, limit)
+  const usesUsdc = kwami.ticket_price_usdc > 0 && kwami.ticket_price_lamports === 0
+  const out: DemoSession[] = []
+
+  for (let i = 0; i < total; i++) {
+    const seed = `${kwami.mint}:${i}`
+    // Wins are placed at the front because they are the most recent thing that
+    // happened to a Kwami that has been beaten — a pot only shrinks that way.
+    const won = i < kwami.sessions_won
+    out.push({
+      id: `demo-${kwami.mint.slice(0, 8)}-${i}`,
+      outcome: won ? 'won' : i % 5 === 0 ? 'expired' : 'lost',
+      asset: usesUsdc ? 'USDC' : 'SOL',
+      ticket_amount: usesUsdc ? kwami.ticket_price_usdc : kwami.ticket_price_lamports,
+      started_at: new Date(Date.now() - (i + 1) * 5_400_000).toISOString(),
+      payout_lamports: won ? kwami.prize_lamports : 0,
+      payout_usdc: won ? kwami.prize_usdc : 0,
+      player_wallet: pseudoBase58(`${seed}:wallet`, 44),
+      tx_start: pseudoBase58(`${seed}:start`, 88),
+      tx_claim: won ? pseudoBase58(`${seed}:claim`, 88) : null,
+    })
+  }
+  return out
 }
 
 export function isDemoMode(): boolean {

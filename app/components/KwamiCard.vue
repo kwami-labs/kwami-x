@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { paletteFromMint } from '~/utils/format'
+import { paletteFor } from '~/utils/format'
 
 interface KwamiSummary {
   mint: string
   name: string
   tagline: string
   renderer: string
+  appearance?: Record<string, unknown>
   state: string
   value_cents: number
   prize_lamports: number
@@ -20,7 +21,7 @@ interface KwamiSummary {
 
 const props = defineProps<{ kwami: KwamiSummary }>()
 
-const palette = computed(() => paletteFromMint(props.kwami.mint))
+const palette = computed(() => paletteFor(props.kwami))
 
 const ticket = computed(() => {
   const { ticket_price_lamports: sol, ticket_price_usdc: usdc } = props.kwami
