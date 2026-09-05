@@ -5,11 +5,12 @@ import {
   describeWalletError,
   isMobileBrowser,
   isUserRejection,
+  normalizeSignInOutput,
   phantomDeeplink,
   waitForPhantom,
   type PhantomProvider,
 } from '~/utils/phantom'
-import { SIWS_STATEMENT, SOLANA_CHAIN_IDS, formatSiwsMessage } from '#shared/auth/siws'
+import { SIWS_STATEMENT, SIWS_VERSION, SOLANA_CHAIN_IDS, formatSiwsMessage } from '#shared/auth/siws'
 import { USDC_BASE_UNITS } from '#shared/game/constants'
 import type { Cluster } from '#shared/solana/constants'
 
@@ -43,6 +44,8 @@ export const useWalletStore = defineStore('wallet', () => {
 
   let provider: PhantomProvider | null = null
   let connection: Connection | null = null
+  /** The provider we have already subscribed to — rebinding would stack listeners. */
+  let eventsBoundTo: PhantomProvider | null = null
 
   function rpc(): Connection {
     connection ??= new Connection(config.public.solanaRpcUrl as string, 'confirmed')
@@ -50,6 +53,8 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   function bindProviderEvents(p: PhantomProvider) {
+    if (eventsBoundTo === p) return
+    eventsBoundTo = p
     // Phantom lets the user switch accounts without disconnecting. Everything
     // downstream keys off `address`, so simply following it keeps signing,
     // balances and "is this my Kwami?" consistent with the wallet UI.
@@ -143,33 +148,55 @@ export const useWalletStore = defineStore('wallet', () => {
    * wall of text. Falls back to connect-then-signMessage for wallets that do
    * not implement SIWS, building the byte-identical message ourselves so the
    * server verifies both paths the same way.
+   *
+   * Every optional SIWS field the server requires (`uri`, `version`, `chainId`)
+   * is passed in: Phantom only puts a field into the signed message when the
+   * dapp supplies it, and our parser rejects messages that omit them.
    */
   async function signIn(nonce: string): Promise<{ message: string; signature: Uint8Array; address: string }> {
     const p = provider ?? (await waitForPhantom())
-    if (!p) throw new Error('Phantom is not installed.')
+    if (!p) {
+      // Same mobile escape hatch as `connect`: the extension cannot exist in a
+      // phone browser, so reopen this page inside Phantom's in-app browser.
+      if (isMobileBrowser()) {
+        window.location.href = phantomDeeplink()
+        throw new Error('Opening Phantom…')
+      }
+      throw new Error('Phantom is not installed.')
+    }
     provider = p
+    bindProviderEvents(p)
 
     const cluster = config.public.solanaCluster as Cluster
+    const chainId = SOLANA_CHAIN_IDS[cluster]
     const domain = window.location.host
     const uri = window.location.origin
     const issuedAt = new Date().toISOString()
 
     if (p.signIn) {
-      const out = await p.signIn({
-        domain,
-        statement: SIWS_STATEMENT,
-        nonce,
-        chainId: SOLANA_CHAIN_IDS[cluster],
-        issuedAt,
-      })
-      address.value = out.address.toBase58()
-      status.value = 'connected'
-      bindProviderEvents(p)
-      return {
+      try {
+        const out = normalizeSignInOutput(
+          await p.signIn({
+            domain,
+            statement: SIWS_STATEMENT,
+            uri,
+            version: SIWS_VERSION,
+            nonce,
+            chainId,
+            issuedAt,
+          }),
+        )
+        address.value = out.address
+        status.value = 'connected'
+        void refreshBalances()
         // Sign exactly what the wallet showed, not a message we re-derive.
-        message: new TextDecoder().decode(out.signedMessage),
-        signature: out.signature,
-        address: out.address.toBase58(),
+        return out
+      } catch (e) {
+        // User dismissed the prompt — surface that cleanly. Any other failure
+        // falls through to connect + signMessage so an older Phantom build that
+        // advertises `signIn` but mis-handles our input still lets people in.
+        if (isUserRejection(e)) throw e
+        console.warn('[wallet] signIn failed, falling back to signMessage', e)
       }
     }
 
@@ -180,15 +207,15 @@ export const useWalletStore = defineStore('wallet', () => {
       address: addr,
       statement: SIWS_STATEMENT,
       uri,
-      version: '1',
-      chainId: SOLANA_CHAIN_IDS[cluster],
+      version: SIWS_VERSION,
+      chainId,
       nonce,
       issuedAt,
     })
     const { signature } = await p.signMessage(new TextEncoder().encode(message), 'utf8')
     address.value = addr
     status.value = 'connected'
-    bindProviderEvents(p)
+    void refreshBalances()
     return { message, signature, address: addr }
   }
 

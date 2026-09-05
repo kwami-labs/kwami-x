@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { verifySignedSiws } from '~~/server/utils/siws-verify'
+import { siwsExpectedDomains, verifySignedSiws } from '~~/server/utils/siws-verify'
 
 const Body = z.object({
   /** The exact message the wallet displayed. */
@@ -18,6 +18,6 @@ const Body = z.object({
  */
 export default defineEventHandler(async (event) => {
   const body = Body.parse(await readBody(event))
-  const { address } = await verifySignedSiws(body)
+  const { address } = await verifySignedSiws(body, { expectedDomains: siwsExpectedDomains(event) })
   return issueWalletSession(event, { chain: 'solana', address })
 })
