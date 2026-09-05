@@ -31,7 +31,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
-use anchor_lang::solana_program::program::invoke;
+use anchor_lang::solana_program::program::{invoke, invoke_signed};
 use anchor_lang::solana_program::system_instruction;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{
@@ -342,7 +342,20 @@ pub mod kwami_vault {
         let digest = hash(&preimage).to_bytes();
         require!(digest == ctx.accounts.kwami.secret_hash, KwamiError::WrongSecret);
 
-        settle_win(&mut ctx.accounts.into_settlement()?)?;
+        let now = Clock::get()?.unix_timestamp;
+        let usdc = ctx.accounts.usdc_leg();
+        let vault = ctx.accounts.vault.to_account_info();
+        let system_program = ctx.accounts.system_program.to_account_info();
+        let player = ctx.accounts.player.to_account_info();
+        settle_win(
+            &mut ctx.accounts.kwami,
+            &mut ctx.accounts.session,
+            &vault,
+            &system_program,
+            &player,
+            usdc,
+            now,
+        )?;
 
         let kwami = &mut ctx.accounts.kwami;
         // The pre-image is now in the ledger for anyone to replay, so the game
@@ -376,8 +389,20 @@ pub mod kwami_vault {
             now,
         )?;
 
-        settle_win(&mut ctx.accounts.inner.into_settlement()?)?;
-        Ok(())
+        let inner = &mut ctx.accounts.inner;
+        let usdc = inner.usdc_leg();
+        let vault = inner.vault.to_account_info();
+        let system_program = inner.system_program.to_account_info();
+        let player = inner.player.to_account_info();
+        settle_win(
+            &mut inner.kwami,
+            &mut inner.session,
+            &vault,
+            &system_program,
+            &player,
+            usdc,
+            now,
+        )
     }
 
     /// Close an expired, unwon session and return its rent to the player.
@@ -443,13 +468,16 @@ pub mod kwami_vault {
         );
 
         let vault = ctx.accounts.vault.to_account_info();
-        let rent_floor = Rent::get()?.minimum_balance(vault.data_len());
-        let available = vault.lamports().saturating_sub(rent_floor);
-        require!(amount <= available, KwamiError::InsufficientVault);
+        require!(amount <= pot_lamports(&vault)?, KwamiError::InsufficientVault);
 
-        **vault.try_borrow_mut_lamports()? -= amount;
-        **ctx.accounts.owner.to_account_info().try_borrow_mut_lamports()? += amount;
-        Ok(())
+        pay_from_vault(
+            &vault,
+            &ctx.accounts.owner.to_account_info(),
+            &ctx.accounts.system_program.to_account_info(),
+            &kwami.mint,
+            kwami.vault_bump,
+            amount,
+        )
     }
 
     /// Owner withdraws USDC from the vault, under the same lifecycle rule.
@@ -588,79 +616,129 @@ fn init_session(
     session.bump = bump;
 }
 
-/// The account set a win settlement touches, gathered so both claim paths
-/// share one implementation and cannot drift apart.
-struct Settlement<'a, 'info> {
-    kwami: &'a mut Account<'info, Kwami>,
-    session: &'a mut Account<'info, Session>,
-    vault: AccountInfo<'info>,
-    vault_usdc: Option<InterfaceAccount<'info, TokenAccount>>,
-    player: AccountInfo<'info>,
-    player_usdc: Option<InterfaceAccount<'info, TokenAccount>>,
-    usdc_mint: Option<InterfaceAccount<'info, Mint>>,
-    token_program: Option<Interface<'info, TokenInterface>>,
-    now: i64,
+/// Move lamports out of the vault.
+///
+/// The vault is a *system-owned* PDA, and a program may only decrement the
+/// lamports of accounts it owns. Writing `**vault.try_borrow_mut_lamports()? -=
+/// n` here would fail at runtime with an external-account-modification error —
+/// so the transfer goes through the System Program, with the vault PDA signing
+/// for itself.
+///
+/// Keeping the vault system-owned is deliberate: it carries no data, so its
+/// lamport balance *is* the SOL pot, with no parallel accounting to drift.
+fn pay_from_vault<'info>(
+    vault: &AccountInfo<'info>,
+    to: &AccountInfo<'info>,
+    system_program: &AccountInfo<'info>,
+    mint: &Pubkey,
+    vault_bump: u8,
+    amount: u64,
+) -> Result<()> {
+    if amount == 0 {
+        return Ok(());
+    }
+    let bump = [vault_bump];
+    let seeds: &[&[u8]] = &[b"vault", mint.as_ref(), &bump];
+    invoke_signed(
+        &system_instruction::transfer(vault.key, to.key, amount),
+        &[vault.clone(), to.clone(), system_program.clone()],
+        &[seeds],
+    )
+    .map_err(Into::into)
+}
+
+/// How much of the vault's balance is actually the pot.
+///
+/// A system account must stay rent-exempt to survive, and that floor was never
+/// anybody's winnings — paying it out would delete the vault along with the
+/// Kwami's ability to ever hold anything again.
+fn pot_lamports(vault: &AccountInfo) -> Result<u64> {
+    let floor = Rent::get()?.minimum_balance(vault.data_len());
+    Ok(vault.lamports().saturating_sub(floor))
+}
+
+/// The USDC half of a settlement, when the Kwami holds any.
+///
+/// Holds owned `AccountInfo` handles rather than references into the accounts
+/// struct. Borrowing from it would keep an immutable borrow of the whole
+/// struct alive across the `&mut kwami` and `&mut session` that settlement
+/// needs — which the borrow checker rejects, and rightly so. `AccountInfo` is
+/// a cheap handle, so cloning costs nothing.
+struct UsdcLeg<'info> {
+    vault_ata: AccountInfo<'info>,
+    player_ata: AccountInfo<'info>,
+    mint: AccountInfo<'info>,
+    token_program: AccountInfo<'info>,
+    /// Vault balance read before settlement begins.
+    vault_amount: u64,
+    decimals: u8,
 }
 
 /// Pay out a win and mark the session settled.
 ///
-/// Deliberately re-checks expiry and the pending flag even though both claim
-/// paths already validated their proof: the proof says *the player knew the
-/// secret*, not *they were still inside the window*.
-fn settle_win(s: &mut Settlement) -> Result<()> {
-    require!(s.session.outcome == SessionOutcome::Pending, KwamiError::SessionResolved);
-    require!(s.now < s.session.expires_at, KwamiError::SessionExpired);
+/// Shared by both claim paths so their economics cannot drift apart. Takes its
+/// accounts explicitly rather than through a borrowed struct, because the two
+/// callers reach them by different routes and threading a lifetime-bound
+/// aggregate through both buys nothing.
+///
+/// Deliberately re-checks expiry and the pending flag even though each caller
+/// has already validated its proof: the proof establishes that the player
+/// *knew the secret*, not that they were still inside the window when they
+/// proved it. Those are different claims.
+#[allow(clippy::too_many_arguments)]
+fn settle_win<'info>(
+    kwami: &mut Account<'info, Kwami>,
+    session: &mut Account<'info, Session>,
+    vault: &AccountInfo<'info>,
+    system_program: &AccountInfo<'info>,
+    player: &AccountInfo<'info>,
+    usdc: Option<UsdcLeg<'info>>,
+    now: i64,
+) -> Result<()> {
+    require!(session.outcome == SessionOutcome::Pending, KwamiError::SessionResolved);
+    require!(now < session.expires_at, KwamiError::SessionExpired);
 
-    let payout_bps = s.kwami.payout_bps;
+    let payout_bps = kwami.payout_bps;
+    let mint_key = kwami.mint;
+    let vault_bump = kwami.vault_bump;
 
-    // --- SOL leg. The vault PDA is system-owned, so its rent-exempt minimum
-    // is not part of the pot and must not be paid out.
-    let rent_floor = Rent::get()?.minimum_balance(s.vault.data_len());
-    let pot_lamports = s.vault.lamports().saturating_sub(rent_floor);
-    let payout_lamports = apply_bps(pot_lamports, payout_bps)?;
-    if payout_lamports > 0 {
-        **s.vault.try_borrow_mut_lamports()? -= payout_lamports;
-        **s.player.try_borrow_mut_lamports()? += payout_lamports;
-    }
+    // --- SOL leg.
+    let payout_lamports = apply_bps(pot_lamports(vault)?, payout_bps)?;
+    pay_from_vault(vault, player, system_program, &mint_key, vault_bump, payout_lamports)?;
 
-    // --- USDC leg, when the Kwami holds any.
+    // --- USDC leg.
     let mut payout_usdc = 0u64;
-    if let (Some(vault_usdc), Some(player_usdc), Some(mint), Some(token_program)) = (
-        s.vault_usdc.as_ref(),
-        s.player_usdc.as_ref(),
-        s.usdc_mint.as_ref(),
-        s.token_program.as_ref(),
-    ) {
-        payout_usdc = apply_bps(vault_usdc.amount, payout_bps)?;
+    if let Some(leg) = usdc {
+        payout_usdc = apply_bps(leg.vault_amount, payout_bps)?;
         if payout_usdc > 0 {
-            let mint_key = s.kwami.mint;
-            let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &[s.kwami.vault_bump]];
+            let bump = [vault_bump];
+            let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &bump];
             token_interface::transfer_checked(
                 CpiContext::new_with_signer(
-                    token_program.to_account_info(),
+                    leg.token_program.clone(),
                     TransferChecked {
-                        from: vault_usdc.to_account_info(),
-                        mint: mint.to_account_info(),
-                        to: player_usdc.to_account_info(),
-                        authority: s.vault.clone(),
+                        from: leg.vault_ata.clone(),
+                        mint: leg.mint.clone(),
+                        to: leg.player_ata.clone(),
+                        authority: vault.clone(),
                     },
                     &[seeds],
                 ),
                 payout_usdc,
-                mint.decimals,
+                leg.decimals,
             )?;
         }
     }
 
-    s.session.outcome = SessionOutcome::Won;
-    s.session.payout_lamports = payout_lamports;
-    s.session.payout_usdc = payout_usdc;
-    s.kwami.sessions_won = s.kwami.sessions_won.checked_add(1).ok_or(KwamiError::MathOverflow)?;
+    session.outcome = SessionOutcome::Won;
+    session.payout_lamports = payout_lamports;
+    session.payout_usdc = payout_usdc;
+    kwami.sessions_won = kwami.sessions_won.checked_add(1).ok_or(KwamiError::MathOverflow)?;
 
     emit!(SessionWon {
-        mint: s.kwami.mint,
-        session: s.session.key(),
-        player: s.session.player,
+        mint: mint_key,
+        session: session.key(),
+        player: session.player,
         payout_lamports,
         payout_usdc,
     });
@@ -822,10 +900,21 @@ pub struct ClaimWin<'info> {
         bump = kwami.vault_bump
     )]
     pub vault: UncheckedAccount<'info>,
+    /// The session being claimed.
+    ///
+    /// Validated by its *contents*, not by re-deriving its address. A `seeds`
+    /// constraint here would be circular — the nonce that forms the seed lives
+    /// inside the very account whose address the seed is supposed to prove.
+    ///
+    /// Checking `kwami` and `player` is sufficient. The account must be
+    /// program-owned and deserialize as a `Session`; it must belong to this
+    /// Kwami; and it must belong to the signer. The only thing left that a
+    /// caller could substitute is one of their *own* sessions against the same
+    /// Kwami — and `start_session_*` allows only one of those to be open at a
+    /// time, while `settle_win` refuses any session that is resolved or past
+    /// its deadline.
     #[account(
         mut,
-        seeds = [b"session", kwami.mint.as_ref(), player.key().as_ref(), &session.nonce.to_le_bytes()],
-        bump = session.bump,
         constraint = session.kwami == kwami.key() @ KwamiError::AttestationMismatch,
         constraint = session.player == player.key() @ KwamiError::AttestationMismatch
     )]
@@ -841,21 +930,34 @@ pub struct ClaimWin<'info> {
     #[account(mut)]
     pub player_usdc: Option<InterfaceAccount<'info, TokenAccount>>,
     pub token_program: Option<Interface<'info, TokenInterface>>,
+    /// Required because paying out SOL is a CPI to the System Program; the
+    /// vault is system-owned and cannot be debited directly.
+    pub system_program: Program<'info, System>,
 }
 
 impl<'info> ClaimWin<'info> {
-    fn into_settlement(&mut self) -> Result<Settlement<'_, 'info>> {
-        Ok(Settlement {
-            now: Clock::get()?.unix_timestamp,
-            kwami: &mut self.kwami,
-            session: &mut self.session,
-            vault: self.vault.to_account_info(),
-            vault_usdc: self.vault_usdc.clone(),
-            player: self.player.to_account_info(),
-            player_usdc: self.player_usdc.clone(),
-            usdc_mint: self.usdc_mint.clone(),
-            token_program: self.token_program.clone(),
-        })
+    /// Gather the USDC accounts, if this Kwami deals in USDC at all.
+    ///
+    /// All four must be present together. A partial set means a malformed
+    /// client, and settling the SOL leg while silently skipping USDC would
+    /// short-change a winner without anything reporting an error.
+    fn usdc_leg(&self) -> Option<UsdcLeg<'info>> {
+        match (
+            self.vault_usdc.as_ref(),
+            self.player_usdc.as_ref(),
+            self.usdc_mint.as_ref(),
+            self.token_program.as_ref(),
+        ) {
+            (Some(vault_ata), Some(player_ata), Some(mint), Some(token_program)) => Some(UsdcLeg {
+                vault_ata: vault_ata.to_account_info(),
+                player_ata: player_ata.to_account_info(),
+                mint: mint.to_account_info(),
+                token_program: token_program.to_account_info(),
+                vault_amount: vault_ata.amount,
+                decimals: mint.decimals,
+            }),
+            _ => None,
+        }
     }
 }
 
@@ -905,6 +1007,9 @@ pub struct WithdrawSol<'info> {
     pub vault: UncheckedAccount<'info>,
     #[account(mut)]
     pub owner: Signer<'info>,
+    /// The vault is system-owned, so paying out of it is a CPI, not a direct
+    /// lamport write.
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
