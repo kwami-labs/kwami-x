@@ -1,7 +1,7 @@
-import { Keypair, PublicKey, TransactionMessage, VersionedTransaction } from '@solana/web3.js'
+import { Keypair, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction } from '@solana/web3.js'
 import { createKwamiIx } from '#shared/solana/instructions'
 import { buildMintInstructions } from '~/utils/mint-instructions'
-import { SECONDARY_ROYALTY_BPS } from '#shared/game/constants'
+import { SECONDARY_ROYALTY_BPS, commissionToLamports } from '#shared/game/constants'
 import type { KwamiRenderer, ResolutionMode } from '#shared/types/kwami'
 
 export interface MintDraft {
@@ -9,6 +9,10 @@ export interface MintDraft {
   tagline: string
   persona: string
   renderer: KwamiRenderer
+  /** The palette the creator designed it in — `{ colorA, colorB }`. */
+  appearance: Record<string, string>
+  /** Voice, game and guard strength, as `shared/kwami/voice` defines them. */
+  voice: Record<string, unknown>
   secret: string
   hints: string[]
   ticketPriceLamports: bigint
@@ -46,6 +50,8 @@ export type MintPhase = 'idle' | 'committing' | 'building' | 'signing' | 'confir
 export function useMintKwami() {
   const wallet = useWalletStore()
   const config = useRuntimeConfig()
+  // `/api/kwami/draft` and `/api/kwami/confirm` both require a signed-in author.
+  const api = useApi()
 
   const phase = ref<MintPhase>('idle')
   const error = ref<string | null>(null)
@@ -70,18 +76,15 @@ export function useMintKwami() {
       // --- 1. Commit the secret. The server salts and hashes it; the hash is
       // what goes on chain, and it is fixed from this moment on.
       phase.value = 'committing'
-      const { draftId, secretHash } = await $fetch<{ draftId: string; secretHash: string }>(
-        '/api/kwami/draft',
-        {
-          method: 'POST',
-          body: {
-            ...draft,
-            ticketPriceLamports: draft.ticketPriceLamports.toString(),
-            ticketPriceUsdc: draft.ticketPriceUsdc.toString(),
-            authorWallet: creator.toBase58(),
-          },
+      const { draftId, secretHash } = await api<{ draftId: string; secretHash: string }>('/api/kwami/draft', {
+        method: 'POST',
+        body: {
+          ...draft,
+          ticketPriceLamports: draft.ticketPriceLamports.toString(),
+          ticketPriceUsdc: draft.ticketPriceUsdc.toString(),
+          authorWallet: creator.toBase58(),
         },
-      )
+      })
 
       // --- 2. Build the bundle.
       phase.value = 'building'
@@ -118,6 +121,23 @@ export function useMintKwami() {
         splToken,
       })
 
+      // The platform's flat commission, appended last so a failure anywhere
+      // earlier in the bundle costs the creator nothing. It is a plain system
+      // transfer rather than a program instruction on purpose: Phantom decodes
+      // it and shows "0.5 SOL to <treasury>" as its own line in the preview,
+      // where an opaque CPI inside the vault instruction would be invisible.
+      const commission = commissionToLamports(config.public.mintCommissionSol as string)
+      const treasury = (config.public.platformTreasury as string) || ''
+      if (commission > 0n && treasury) {
+        instructions.push(
+          SystemProgram.transfer({
+            fromPubkey: creator,
+            toPubkey: new PublicKey(treasury),
+            lamports: commission,
+          }),
+        )
+      }
+
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
       const message = new TransactionMessage({
         payerKey: creator,
@@ -140,7 +160,7 @@ export function useMintKwami() {
       phase.value = 'confirming'
       await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed')
 
-      await $fetch('/api/kwami/confirm', {
+      await api('/api/kwami/confirm', {
         method: 'POST',
         body: { draftId, mint: mint.toBase58(), signature: sig },
       })
