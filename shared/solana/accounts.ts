@@ -142,3 +142,60 @@ export function decodeKwamiAccount(data: Uint8Array): KwamiAccount {
     bump: r.u8(),
   }
 }
+
+/** Mirrors `Asset` in state.rs. */
+export const ASSETS = ['SOL', 'USDC'] as const
+export type ChainAsset = (typeof ASSETS)[number]
+
+/** Mirrors `SessionOutcome` in state.rs. */
+export const SESSION_OUTCOMES = ['pending', 'won', 'expired'] as const
+export type ChainSessionOutcome = (typeof SESSION_OUTCOMES)[number]
+
+export interface SessionAccount {
+  kwami: string
+  player: string
+  nonce: bigint
+  asset: ChainAsset
+  /** Gross ticket, before the protocol fee. */
+  ticketAmount: bigint
+  startedAt: bigint
+  expiresAt: bigint
+  outcome: ChainSessionOutcome
+  payoutLamports: bigint
+  payoutUsdc: bigint
+  bump: number
+}
+
+/** Total size of a serialised `Session`, discriminator included. */
+export const SESSION_ACCOUNT_SIZE = DISCRIMINATOR + PUBKEY * 2 + 8 + 1 + 8 + 8 + 8 + 1 + 8 + 8 + 1
+
+/**
+ * Decode a `Session`.
+ *
+ * This account existing, owned by the program, with the right player and nonce, IS the proof
+ * that a ticket was paid: the program only ever creates it inside `start_session_sol` or
+ * `start_session_usdc`, after the transfers. The server used to accept any transaction that
+ * merely listed the session PDA among its account keys — including one that never called the
+ * program at all — so a challenger could open a voice session, and reach the Kwami's brain,
+ * without paying.
+ */
+export function decodeSessionAccount(data: Uint8Array): SessionAccount {
+  if (data.length < SESSION_ACCOUNT_SIZE) {
+    throw new Error(`Session account is ${data.length} bytes, expected at least ${SESSION_ACCOUNT_SIZE}`)
+  }
+
+  const r = new Reader(data, DISCRIMINATOR)
+  return {
+    kwami: r.pubkey(),
+    player: r.pubkey(),
+    nonce: r.u64(),
+    asset: r.variant(ASSETS),
+    ticketAmount: r.u64(),
+    startedAt: r.i64(),
+    expiresAt: r.i64(),
+    outcome: r.variant(SESSION_OUTCOMES),
+    payoutLamports: r.u64(),
+    payoutUsdc: r.u64(),
+    bump: r.u8(),
+  }
+}
