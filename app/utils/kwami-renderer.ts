@@ -150,7 +150,7 @@ float snoise(vec3 v) {
 }
 `
 
-const VERTEX = `
+export const KWAMI_VERTEX_SHADER = `
 uniform float uTime;
 uniform float uAmplitude;
 uniform float uFrequency;
@@ -164,29 +164,73 @@ varying float vDisplace;
 
 ${SIMPLEX}
 
-void main() {
-  // Two octaves: a slow swell that reads as breathing, plus a faster ripple
-  // that only shows up when the Kwami is speaking or agitated.
-  float slow = snoise(normal * uFrequency + uTime * 0.22);
-  float fast = snoise(normal * uFrequency * 2.7 - uTime * 0.65);
+/**
+ * How far the surface is pushed out along a given direction on the sphere.
+ *
+ * Factored out of main so the normal can be derived from it. Two octaves: a
+ * slow swell that reads as breathing, plus a faster ripple that only shows up
+ * when the Kwami is speaking or agitated.
+ */
+float displaceAt(vec3 dir, float life) {
+  float slow = snoise(dir * uFrequency + uTime * 0.22);
+  float fast = snoise(dir * uFrequency * 2.7 - uTime * 0.65);
+  float d = (slow * 0.7 + fast * 0.3 * (0.25 + uAudio)) * uAmplitude * life;
+  return d + uAudio * 0.22 + uArousal * 0.08;
+}
 
+void main() {
   // A dying Kwami deflates rather than changing colour alone — the silhouette
   // is what a player reads at a glance in a grid of thirty.
   float life = mix(0.45, 1.0, uVitality);
-  float displace = (slow * 0.7 + fast * 0.3 * (0.25 + uAudio)) * uAmplitude * life;
-  displace += uAudio * 0.22 + uArousal * 0.08;
 
+  vec3 dir = normalize(normal);
+  float displace = displaceAt(dir, life);
   vDisplace = displace;
-  vNormal = normalize(normalMatrix * normal);
 
-  vec3 displaced = position + normal * displace;
-  vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
+  /**
+   * The normal of the *displaced* surface, sampled analytically.
+   *
+   * Pushing vertices along the sphere's normal leaves the shading normal
+   * describing a shape that is no longer there: every crest and trough the
+   * geometry actually has becomes invisible, and the Kwami reads as a flat
+   * gradient rolling over a ball. Recovering it in the fragment shader with
+   * dFdx/dFdy is worse — screen-space derivatives of an interpolated position
+   * give the *face* normal, so the whole thing turns into visible triangles.
+   *
+   * Instead, evaluate the same noise at two nearby points on the sphere and
+   * take the cross product of the resulting edges. Six extra noise samples per
+   * vertex, and the surface finally catches light the way its silhouette says
+   * it should.
+   */
+  // Any vector not parallel to dir works as a seed; the pole is the one place
+  // the obvious choice degenerates, so it is swapped out there.
+  vec3 seed = abs(dir.y) > 0.99 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+  vec3 tangent = normalize(cross(seed, dir));
+  vec3 bitangent = cross(dir, tangent);
+
+  float eps = 0.035;
+  vec3 dirT = normalize(dir + tangent * eps);
+  vec3 dirB = normalize(dir + bitangent * eps);
+
+  vec3 p0 = dir * (1.0 + displace);
+  vec3 pT = dirT * (1.0 + displaceAt(dirT, life));
+  vec3 pB = dirB * (1.0 + displaceAt(dirB, life));
+
+  vec3 displacedNormal = normalize(cross(pT - p0, pB - p0));
+  // The cross product's sign depends on the tangent frame's handedness, which
+  // flips across the sphere. Align it outwards so lighting is not inverted on
+  // half the surface.
+  if (dot(displacedNormal, dir) < 0.0) displacedNormal = -displacedNormal;
+
+  vNormal = normalize(normalMatrix * displacedNormal);
+
+  vec4 mvPosition = modelViewMatrix * vec4(p0, 1.0);
   vViewDir = normalize(-mvPosition.xyz);
   gl_Position = projectionMatrix * mvPosition;
 }
 `
 
-const FRAGMENT = `
+export const KWAMI_FRAGMENT_SHADER = `
 uniform vec3 uColorA;
 uniform vec3 uColorB;
 uniform float uRimPower;
@@ -197,8 +241,26 @@ varying vec3 vNormal;
 varying vec3 vViewDir;
 varying float vDisplace;
 
+/** Key light, in view space. Over the shoulder and slightly above. */
+const vec3 KEY = vec3(0.45, 0.72, 0.55);
+/** A cool fill from below, so the unlit side is shadow rather than a hole. */
+const vec3 FILL = vec3(-0.4, -0.5, 0.3);
+
 void main() {
-  float fresnel = pow(1.0 - max(dot(normalize(vNormal), normalize(vViewDir)), 0.0), uRimPower);
+  vec3 n = normalize(vNormal);
+  vec3 view = normalize(vViewDir);
+
+  float fresnel = pow(1.0 - max(dot(n, view), 0.0), uRimPower);
+
+  // Wrapped diffuse rather than plain Lambert: a hard terminator on a small
+  // dark object reads as a crescent moon, not as a creature.
+  float key = max(dot(n, normalize(KEY)) * 0.5 + 0.5, 0.0);
+  float fill = max(dot(n, normalize(FILL)) * 0.5 + 0.5, 0.0);
+
+  // A tight specular gives the surface a wet, alive quality — without it the
+  // whole thing reads as chalk no matter how bright the diffuse is.
+  vec3 halfVector = normalize(normalize(KEY) + view);
+  float spec = pow(max(dot(n, halfVector), 0.0), 38.0);
 
   // Colour tracks displacement, so the surface reads as depth rather than a
   // flat gradient rolling over a sphere.
@@ -208,8 +270,19 @@ void main() {
   float grey = dot(base, vec3(0.299, 0.587, 0.114));
   base = mix(vec3(grey * 0.55), base, uVitality);
 
-  vec3 rim = mix(uColorB, vec3(1.0), 0.35) * fresnel * (0.6 + uAudio * 0.8) * uVitality;
-  gl_FragColor = vec4(base * 0.55 + rim, 1.0);
+  vec3 lit = base * (0.26 + 0.95 * key * key) + base * uColorA * 0.3 * fill;
+  vec3 rim = mix(uColorB, vec3(1.0), 0.35) * fresnel * (0.8 + uAudio * 0.9) * uVitality;
+
+  vec3 color = lit + rim + vec3(spec) * (0.4 + uAudio * 0.5) * uVitality;
+
+  // Filmic-ish rolloff. The rim and the specular both overshoot 1.0 on a
+  // saturated palette, and clipping them turns a coloured highlight white.
+  color = color / (color + vec3(0.9));
+  // Undo the rolloff's overall darkening without reintroducing the clipping —
+  // the shoulder is there to tame highlights, not to mute the midtones.
+  color = pow(color, vec3(0.85)) * 1.12;
+
+  gl_FragColor = vec4(color, 1.0);
 }
 `
 
@@ -273,7 +346,11 @@ export function mountKwami(
     uColorB: { value: new Color(options.colorB ?? '#3ddc97') },
   }
 
-  const material = new ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms })
+  const material = new ShaderMaterial({
+    vertexShader: KWAMI_VERTEX_SHADER,
+    fragmentShader: KWAMI_FRAGMENT_SHADER,
+    uniforms,
+  })
 
   const mesh = new Mesh(new IcosahedronGeometry(1, preset.detail), material)
   scene.add(mesh)
