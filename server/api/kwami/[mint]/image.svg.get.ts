@@ -1,3 +1,4 @@
+import { paletteFromMint } from '#shared/game/palette'
 import { DEMO_KWAMIS, isDemoMode } from '~~/server/utils/demo'
 import { serviceClient } from '~~/server/utils/supabase'
 import { isValidAddress } from '~~/server/utils/solana'
@@ -80,12 +81,6 @@ async function loadKwami(mint: string) {
 }
 
 /** The same hash the client uses, so a Kwami looks like itself everywhere. */
-function paletteFromMint(mint: string): { a: string; b: string } {
-  let hash = 0
-  for (let i = 0; i < mint.length; i++) hash = (hash * 31 + mint.charCodeAt(i)) >>> 0
-  const hueA = hash % 360
-  return { a: `hsl(${hueA} 78% 62%)`, b: `hsl(${(hueA + 140) % 360} 72% 58%)` }
-}
 
 /** Kwami names are user-supplied and land inside an XML document. */
 function escapeXml(value: string): string {

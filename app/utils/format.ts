@@ -71,13 +71,5 @@ export function relativeTime(iso: string | number | Date): string {
   return 'just now'
 }
 
-/** A stable colour pair derived from a Kwami's mint, so it looks the same everywhere. */
-export function paletteFromMint(mint: string): { a: string; b: string } {
-  let hash = 0
-  for (let i = 0; i < mint.length; i++) hash = (hash * 31 + mint.charCodeAt(i)) >>> 0
-  const hueA = hash % 360
-  // Complementary-ish rather than exactly opposite: 140° keeps both colours
-  // inside a range that stays legible against the dark surface.
-  const hueB = (hueA + 140) % 360
-  return { a: `hsl(${hueA} 78% 62%)`, b: `hsl(${hueB} 72% 58%)` }
-}
+// Defined in shared/ so the SVG thumbnail and the WebGL renderer cannot drift from the CSS.
+export { paletteFromMint } from '#shared/game/palette'
