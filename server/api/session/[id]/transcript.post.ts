@@ -4,6 +4,7 @@ import { requireUser, serviceClient } from '~~/server/utils/supabase'
 import { loadSecret } from '~~/server/utils/kwami-secret'
 import { signWinAttestation } from '~~/server/utils/attest'
 import { assertNotDemo } from '~~/server/utils/demo'
+import { assertSessionOpen, clampTurnOffset, TURN_ARRIVAL_GRACE_MS } from '~~/server/utils/session-window'
 
 const Body = z.object({
   role: z.enum(['player', 'kwami']),
@@ -45,28 +46,31 @@ export default defineEventHandler(async (event) => {
   if (session.player_id !== user.id)
     throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
 
+  // The server's clock closes the session, not the client's `at`. Without this the only
+  // deadline check was against a number the browser chose, so reporting `at: 0` forever kept a
+  // session open indefinitely — unlimited turns and unlimited reads of the similarity score
+  // below, which together give up the secret.
+  const window = await assertSessionOpen(db, session, { graceMs: TURN_ARRIVAL_GRACE_MS })
+  const at = clampTurnOffset(body.at, window)
+
   await db.from('transcript_turns').insert({
     session_id: session.id,
     role: body.role,
     text: body.text,
-    at_ms: body.at,
+    at_ms: at,
     confidence: body.confidence,
   })
 
-  // Only the player can win, and only while the session is still open.
-  if (body.role !== 'player' || session.outcome !== 'pending') {
+  // Only the player can win.
+  if (body.role !== 'player') {
     return { won: false, outcome: session.outcome }
   }
-
-  const startedAt = new Date(session.started_at).getTime()
-  const expiresAt = new Date(session.expires_at).getTime()
-  const deadlineMs = expiresAt - startedAt
 
   // The utterance timestamp decides, not arrival time. A phrase spoken at
   // 2:59.4 wins even if the transcript event lands after the clock ran out —
   // network latency is not something a player should lose to.
-  if (body.at > deadlineMs) {
-    return { won: false, outcome: 'pending', lateBy: body.at - deadlineMs }
+  if (at > window.deadlineMs) {
+    return { won: false, outcome: 'pending', lateBy: at - window.deadlineMs }
   }
 
   const { secret, salt } = await loadSecret(session.kwami_id)

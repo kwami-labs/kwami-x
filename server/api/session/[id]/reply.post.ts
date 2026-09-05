@@ -3,6 +3,7 @@ import { requireUser, serviceClient } from '~~/server/utils/supabase'
 import { loadSecret } from '~~/server/utils/kwami-secret'
 import { respond } from '~~/server/utils/kwami-brain'
 import { assertNotDemo } from '~~/server/utils/demo'
+import { assertSessionOpen } from '~~/server/utils/session-window'
 
 const Body = z.object({
   utterance: z.string().min(1).max(2000),
@@ -32,7 +33,9 @@ export default defineEventHandler(async (event) => {
   if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session.' })
   if (session.player_id !== user.id)
     throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
-  if (session.outcome !== 'pending') throw createError({ statusCode: 409, statusMessage: 'Session is over.' })
+  // Closes the session on the server clock. Answering after time is up is free reconnaissance:
+  // the Kwami's replies are the main channel a player reads the secret's shape from.
+  await assertSessionOpen(db, session)
 
   const { data: kwami } = await db.from('kwamis').select('persona, voice').eq('id', session.kwami_id).single()
 
