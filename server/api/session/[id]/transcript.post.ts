@@ -34,13 +34,16 @@ export default defineEventHandler(async (event) => {
   const db = serviceClient()
   const { data: session, error } = await db
     .from('game_sessions')
-    .select('id, kwami_id, kwami_mint, player_id, player_wallet, account, nonce, outcome, started_at, expires_at')
+    .select(
+      'id, kwami_id, kwami_mint, player_id, player_wallet, account, nonce, outcome, started_at, expires_at',
+    )
     .eq('id', sessionId)
     .maybeSingle()
 
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
   if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session.' })
-  if (session.player_id !== user.id) throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
+  if (session.player_id !== user.id)
+    throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
 
   await db.from('transcript_turns').insert({
     session_id: session.id,

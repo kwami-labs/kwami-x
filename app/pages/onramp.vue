@@ -38,7 +38,8 @@ async function openWidget() {
       <span class="eyebrow">On-ramp</span>
       <h1>Buy SOL or USDC with a card.</h1>
       <p class="muted">
-        MoonPay sends it straight to your Phantom wallet. Kwami never touches the funds and never sees your card.
+        MoonPay sends it straight to your Phantom wallet. Kwami never touches the funds and never sees your
+        card.
       </p>
     </header>
 
@@ -56,8 +57,14 @@ async function openWidget() {
       <div class="field">
         <span class="label">Buy</span>
         <div class="row gap-1">
-          <button class="chip" :class="{ 'chip--on': currency === 'sol' }" @click="currency = 'sol'">SOL</button>
-          <button class="chip" :class="{ 'chip--on': currency === 'usdc_sol' }" @click="currency = 'usdc_sol'">
+          <button class="chip" :class="{ 'chip--on': currency === 'sol' }" @click="currency = 'sol'">
+            SOL
+          </button>
+          <button
+            class="chip"
+            :class="{ 'chip--on': currency === 'usdc_sol' }"
+            @click="currency = 'usdc_sol'"
+          >
             USDC
           </button>
         </div>
@@ -66,7 +73,13 @@ async function openWidget() {
       <div class="field">
         <span class="label">Amount (USD)</span>
         <div class="row gap-1">
-          <button v-for="a in [25, 50, 100, 250]" :key="a" class="chip" :class="{ 'chip--on': amount === a }" @click="amount = a">
+          <button
+            v-for="a in [25, 50, 100, 250]"
+            :key="a"
+            class="chip"
+            :class="{ 'chip--on': amount === a }"
+            @click="amount = a"
+          >
             ${{ a }}
           </button>
         </div>
@@ -90,7 +103,12 @@ async function openWidget() {
 </template>
 
 <style scoped>
-.onramp { display: flex; flex-direction: column; gap: 22px; max-width: 620px; }
+.onramp {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 620px;
+}
 
 .chip {
   padding: 6px 14px;
@@ -100,7 +118,10 @@ async function openWidget() {
   cursor: pointer;
   font-size: 0.87rem;
 }
-.chip--on { background: var(--accent-soft); border-color: var(--accent-line); }
+.chip--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
 
 .addr {
   display: block;
@@ -113,6 +134,14 @@ async function openWidget() {
   color: var(--fg-muted);
 }
 
-.widget { padding: 0; overflow: hidden; height: 640px; }
-.widget iframe { width: 100%; height: 100%; border: 0; }
+.widget {
+  padding: 0;
+  overflow: hidden;
+  height: 640px;
+}
+.widget iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
 </style>

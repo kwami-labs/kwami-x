@@ -100,12 +100,7 @@ export interface KwamiOffChain {
   updatedAt: string
 }
 
-export type KwamiRenderer =
-  | 'blob-xyz'
-  | 'crystal-ball'
-  | 'orbital-shards'
-  | 'stars-genesis'
-  | 'black-hole'
+export type KwamiRenderer = 'blob-xyz' | 'crystal-ball' | 'orbital-shards' | 'stars-genesis' | 'black-hole'
 
 export interface KwamiVoiceConfig {
   llmModel: string

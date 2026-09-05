@@ -10,7 +10,9 @@ const shown = computed(() => {
   const all = [...rows.value]
   if (tab.value === 'contested') return all.sort((a, b) => b.sessions_played - a.sessions_played)
   if (tab.value === 'fallen') return all.filter((k) => k.state === 'dead' || k.state === 'cracked')
-  return all.filter((k) => k.state === 'live' || k.state === 'paused').sort((a, b) => b.value_cents - a.value_cents)
+  return all
+    .filter((k) => k.state === 'live' || k.state === 'paused')
+    .sort((a, b) => b.value_cents - a.value_cents)
 })
 </script>
 
@@ -23,8 +25,12 @@ const shown = computed(() => {
 
     <div class="row gap-1">
       <button class="chip" :class="{ 'chip--on': tab === 'pot' }" @click="tab = 'pot'">Biggest pots</button>
-      <button class="chip" :class="{ 'chip--on': tab === 'contested' }" @click="tab = 'contested'">Most attempts</button>
-      <button class="chip" :class="{ 'chip--on': tab === 'fallen' }" @click="tab = 'fallen'">The fallen</button>
+      <button class="chip" :class="{ 'chip--on': tab === 'contested' }" @click="tab = 'contested'">
+        Most attempts
+      </button>
+      <button class="chip" :class="{ 'chip--on': tab === 'fallen' }" @click="tab = 'fallen'">
+        The fallen
+      </button>
     </div>
 
     <div v-if="pending" class="card"><p class="dim">Loading…</p></div>
@@ -51,7 +57,9 @@ const shown = computed(() => {
             <td>
               <NuxtLink :to="`/kwami/${k.mint}`" class="board__name">
                 <span>{{ k.name }}</span>
-                <span v-if="k.state !== 'live'" class="badge" :class="`badge--${k.state}`">{{ k.state }}</span>
+                <span v-if="k.state !== 'live'" class="badge" :class="`badge--${k.state}`">{{
+                  k.state
+                }}</span>
               </NuxtLink>
             </td>
             <td class="board__num num">{{ formatCents(k.value_cents) }}</td>
@@ -74,11 +82,21 @@ const shown = computed(() => {
   cursor: pointer;
   font-size: 0.87rem;
 }
-.chip--on { background: var(--accent-soft); border-color: var(--accent-line); }
+.chip--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
 
-.board { padding: 0; overflow-x: auto; }
+.board {
+  padding: 0;
+  overflow-x: auto;
+}
 
-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
 
 th {
   text-align: left;
@@ -92,14 +110,34 @@ th {
   white-space: nowrap;
 }
 
-td { padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
-tbody tr:last-child td { border-bottom: 0; }
-tbody tr:hover { background: var(--panel); }
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+tbody tr:hover {
+  background: var(--panel);
+}
 
-.board__rank { width: 48px; }
-.board__num { text-align: right; white-space: nowrap; }
-.board__vit { width: 130px; }
+.board__rank {
+  width: 48px;
+}
+.board__num {
+  text-align: right;
+  white-space: nowrap;
+}
+.board__vit {
+  width: 130px;
+}
 
-.board__name { display: flex; align-items: center; gap: 8px; }
-.board__name:hover span:first-child { color: var(--accent); }
+.board__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.board__name:hover span:first-child {
+  color: var(--accent);
+}
 </style>

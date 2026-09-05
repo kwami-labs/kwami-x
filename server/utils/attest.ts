@@ -34,7 +34,11 @@ export interface SignedAttestation {
  * any one and a captured attestation becomes replayable against another
  * session, by another wallet, or forever.
  */
-export function attestationMessage(sessionAccount: string, playerWallet: string, validUntil: number): Uint8Array {
+export function attestationMessage(
+  sessionAccount: string,
+  playerWallet: string,
+  validUntil: number,
+): Uint8Array {
   const message = new Uint8Array(MESSAGE_LEN)
   message.set(new TextEncoder().encode(DOMAIN_TAG), 0)
   message.set(new PublicKey(sessionAccount).toBytes(), 8)

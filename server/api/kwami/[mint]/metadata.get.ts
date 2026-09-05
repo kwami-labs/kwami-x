@@ -27,9 +27,7 @@ export default defineEventHandler(async (event): Promise<TokenMetadataJson> => {
   const config = useRuntimeConfig()
   const site = config.public.siteUrl as string
 
-  const kwami = isDemoMode()
-    ? DEMO_KWAMIS.find((k) => k.mint === mint)
-    : await loadKwami(mint)
+  const kwami = isDemoMode() ? DEMO_KWAMIS.find((k) => k.mint === mint) : await loadKwami(mint)
 
   if (!kwami) throw createError({ statusCode: 404, statusMessage: 'No such Kwami.' })
 

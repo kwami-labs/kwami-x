@@ -1,10 +1,4 @@
-import {
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  TransactionMessage,
-  VersionedTransaction,
-} from '@solana/web3.js'
+import { Keypair, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction } from '@solana/web3.js'
 import { createKwamiIx } from '#shared/solana/instructions'
 import { createMetadataV3Ix, MAX_NAME_LENGTH } from '#shared/solana/token-metadata'
 import { SECONDARY_ROYALTY_BPS } from '#shared/game/constants'
@@ -76,15 +70,18 @@ export function useMintKwami() {
       // --- 1. Commit the secret. The server salts and hashes it; the hash is
       // what goes on chain, and it is fixed from this moment on.
       phase.value = 'committing'
-      const { draftId, secretHash } = await $fetch<{ draftId: string; secretHash: string }>('/api/kwami/draft', {
-        method: 'POST',
-        body: {
-          ...draft,
-          ticketPriceLamports: draft.ticketPriceLamports.toString(),
-          ticketPriceUsdc: draft.ticketPriceUsdc.toString(),
-          authorWallet: creator.toBase58(),
+      const { draftId, secretHash } = await $fetch<{ draftId: string; secretHash: string }>(
+        '/api/kwami/draft',
+        {
+          method: 'POST',
+          body: {
+            ...draft,
+            ticketPriceLamports: draft.ticketPriceLamports.toString(),
+            ticketPriceUsdc: draft.ticketPriceUsdc.toString(),
+            authorWallet: creator.toBase58(),
+          },
         },
-      })
+      )
 
       // --- 2. Build the bundle.
       phase.value = 'building'

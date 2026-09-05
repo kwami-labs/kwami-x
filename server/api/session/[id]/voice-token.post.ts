@@ -31,7 +31,8 @@ export default defineEventHandler(async (event) => {
     .maybeSingle()
 
   if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session.' })
-  if (session.player_id !== user.id) throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
+  if (session.player_id !== user.id)
+    throw createError({ statusCode: 403, statusMessage: 'Not your session.' })
   if (session.outcome !== 'pending') throw createError({ statusCode: 409, statusMessage: 'Session is over.' })
   if (!session.room) throw createError({ statusCode: 409, statusMessage: 'Session has no room.' })
 

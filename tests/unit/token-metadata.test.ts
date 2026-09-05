@@ -109,9 +109,7 @@ describe('createMetadataV3Ix', () => {
   it('rejects creator shares that do not total 100', () => {
     // The program rejects this too, but only mid-transaction — after the user
     // has already approved it in their wallet.
-    expect(() =>
-      base({ creators: [{ address: CREATOR, verified: true, share: 60 }] }),
-    ).toThrow(/total 100/)
+    expect(() => base({ creators: [{ address: CREATOR, verified: true, share: 60 }] })).toThrow(/total 100/)
   })
 
   it('enforces the on-chain string limits in bytes, not characters', () => {

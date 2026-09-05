@@ -43,7 +43,10 @@ export interface PhantomProvider {
   isConnected: boolean
   connect(opts?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: PublicKey }>
   disconnect(): Promise<void>
-  signMessage(message: Uint8Array, encoding?: 'utf8' | 'hex'): Promise<{ signature: Uint8Array; publicKey: PublicKey }>
+  signMessage(
+    message: Uint8Array,
+    encoding?: 'utf8' | 'hex',
+  ): Promise<{ signature: Uint8Array; publicKey: PublicKey }>
   signIn?(input: PhantomSignInInput): Promise<PhantomSignInOutput>
   signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>
   signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]>

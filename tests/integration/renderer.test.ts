@@ -28,7 +28,9 @@ describe('renderer presets', () => {
   })
 
   it('gives each renderer a distinguishable silhouette', () => {
-    const signatures = Object.values(RENDERER_PRESETS).map((p) => `${p.amplitude}:${p.frequency}:${p.particles}`)
+    const signatures = Object.values(RENDERER_PRESETS).map(
+      (p) => `${p.amplitude}:${p.frequency}:${p.particles}`,
+    )
     expect(new Set(signatures).size).toBe(signatures.length)
   })
 })

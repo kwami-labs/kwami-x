@@ -20,14 +20,16 @@ const SEPARATOR = '\u001f'
 
 /** A phrase reduced to its comparable core. */
 export function normalizePhrase(input: string): string {
-  return input
-    .normalize('NFD')
-    .replace(COMBINING_MARKS, '')
-    .toLowerCase()
-    // Keep letters, digits and spaces; everything else becomes a separator.
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
+  return (
+    input
+      .normalize('NFD')
+      .replace(COMBINING_MARKS, '')
+      .toLowerCase()
+      // Keep letters, digits and spaces; everything else becomes a separator.
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim()
+      .replace(/\s+/g, ' ')
+  )
 }
 
 /** Split a normalised phrase into words. */
@@ -195,9 +197,11 @@ export function validateSecret(secret: string): { valid: boolean; reason?: strin
   const w = words(secret)
   if (w.length === 0) return { valid: false, reason: 'Secret cannot be empty.' }
   const normalized = w.join(' ')
-  if (normalized.length < 4) return { valid: false, reason: 'Secret must be at least 4 characters once normalised.' }
+  if (normalized.length < 4)
+    return { valid: false, reason: 'Secret must be at least 4 characters once normalised.' }
   if (normalized.length > 120) return { valid: false, reason: 'Secret must be at most 120 characters.' }
-  if (w.length > 12) return { valid: false, reason: 'Secret must be at most 12 words — it has to be speakable.' }
+  if (w.length > 12)
+    return { valid: false, reason: 'Secret must be at most 12 words — it has to be speakable.' }
   if (w.length === 1 && w[0]!.length < 5) {
     return { valid: false, reason: 'A single-word secret must be at least 5 characters.' }
   }

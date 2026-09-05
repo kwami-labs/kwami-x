@@ -33,9 +33,18 @@ onMounted(() => {
 // Audio level changes ~50 times a second. It is pushed straight into the
 // renderer handle, which owns its own smoothing, rather than through a
 // reactive uniform that would re-render the component each frame.
-watch(() => props.level, (v) => handle?.setAudioLevel(v))
-watch(() => props.arousal, (v) => handle?.setArousal(v))
-watch(() => props.vitality, (v) => handle?.setVitality(v))
+watch(
+  () => props.level,
+  (v) => handle?.setAudioLevel(v),
+)
+watch(
+  () => props.arousal,
+  (v) => handle?.setArousal(v),
+)
+watch(
+  () => props.vitality,
+  (v) => handle?.setVitality(v),
+)
 watch([() => props.colorA, () => props.colorB], ([a, b]) => handle?.setColors(a, b))
 
 // The renderer sizes itself from its parent, so a layout change that does not

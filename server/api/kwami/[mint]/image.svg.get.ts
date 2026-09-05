@@ -89,7 +89,8 @@ function paletteFromMint(mint: string): { a: string; b: string } {
 
 /** Kwami names are user-supplied and land inside an XML document. */
 function escapeXml(value: string): string {
-  return value.replace(/[<>&'"]/g, (c) =>
-    ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c] ?? c,
+  return value.replace(
+    /[<>&'"]/g,
+    (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c] ?? c,
   )
 }

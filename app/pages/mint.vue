@@ -43,7 +43,8 @@ const renderers: Array<{ id: KwamiRenderer; label: string; note: string }> = [
 const secretCheck = computed(() => (form.secret ? validateSecret(form.secret) : { valid: false }))
 
 const ticketPreview = computed(() => {
-  const lamports = form.ticketAsset === 'USDC' ? 0n : BigInt(Math.round(form.ticketSol * Number(LAMPORTS_PER_SOL)))
+  const lamports =
+    form.ticketAsset === 'USDC' ? 0n : BigInt(Math.round(form.ticketSol * Number(LAMPORTS_PER_SOL)))
   const usdc = form.ticketAsset === 'SOL' ? 0n : BigInt(Math.round(form.ticketUsdc * Number(USDC_BASE_UNITS)))
   return { lamports, usdc, split: splitTicket(lamports > 0n ? lamports : usdc) }
 })
@@ -85,8 +86,8 @@ async function onSubmit() {
         <span class="eyebrow">Mint</span>
         <h1>Hide a phrase. Let people pay to find it.</h1>
         <p class="muted">
-          Everything below is written to the chain once and can never be changed — not by you, not by us. Choose
-          carefully.
+          Everything below is written to the chain once and can never be changed — not by you, not by us.
+          Choose carefully.
         </p>
       </header>
 
@@ -94,7 +95,7 @@ async function onSubmit() {
         <h3>Identity</h3>
         <div class="field">
           <label class="label" for="name">Name</label>
-          <input id="name" v-model="form.name" class="input" placeholder="The Vault Keeper" maxlength="48" >
+          <input id="name" v-model="form.name" class="input" placeholder="The Vault Keeper" maxlength="48" />
         </div>
         <div class="field">
           <label class="label" for="tagline">Tagline</label>
@@ -104,7 +105,7 @@ async function onSubmit() {
             class="input"
             placeholder="Answers only in questions."
             maxlength="160"
-          >
+          />
         </div>
         <div class="field">
           <label class="label" for="persona">Persona</label>
@@ -115,7 +116,8 @@ async function onSubmit() {
             placeholder="Socratic and cold. Answers questions with questions. Treats every challenger as a student."
           />
           <span class="hint">
-            This steers how it talks. It will never be told to reveal the phrase — that part is enforced separately.
+            This steers how it talks. It will never be told to reveal the phrase — that part is enforced
+            separately.
           </span>
         </div>
 
@@ -148,18 +150,23 @@ async function onSubmit() {
             placeholder="the moon remembers"
             autocomplete="off"
             spellcheck="false"
-          >
+          />
           <span v-if="form.secret && !secretCheck.valid" class="error-text">{{ secretCheck.reason }}</span>
           <span v-else class="hint">
-            Matching ignores case, accents and punctuation, and forgives one transcription slip — a challenger who
-            genuinely says it will not lose on a technicality.
+            Matching ignores case, accents and punctuation, and forgives one transcription slip — a challenger
+            who genuinely says it will not lose on a technicality.
           </span>
         </div>
 
         <div class="field">
           <span class="label">Public hints <span class="dim">(optional)</span></span>
-          <input v-model="form.hints[0]" class="input" placeholder="Three words." maxlength="140" >
-          <input v-model="form.hints[1]" class="input" placeholder="The middle word is a colour." maxlength="140" >
+          <input v-model="form.hints[0]" class="input" placeholder="Three words." maxlength="140" />
+          <input
+            v-model="form.hints[1]"
+            class="input"
+            placeholder="The middle word is a colour."
+            maxlength="140"
+          />
           <span class="hint">Shown before anyone pays. Good hints sell more tickets than no hints.</span>
         </div>
 
@@ -174,8 +181,8 @@ async function onSubmit() {
             >
               <strong>Commit–reveal</strong>
               <span class="dim">
-                Trustless. The winner submits the phrase and the program checks the hash itself. The phrase becomes
-                public, so your Kwami retires after one win.
+                Trustless. The winner submits the phrase and the program checks the hash itself. The phrase
+                becomes public, so your Kwami retires after one win.
               </span>
             </button>
             <button
@@ -201,7 +208,7 @@ async function onSubmit() {
           <span class="label">Ticket in</span>
           <div class="chips">
             <button
-              v-for="a in (['SOL', 'USDC', 'both'] as const)"
+              v-for="a in ['SOL', 'USDC', 'both'] as const"
               :key="a"
               type="button"
               class="chip"
@@ -216,11 +223,25 @@ async function onSubmit() {
         <div class="grid grid--2">
           <div v-if="form.ticketAsset !== 'USDC'" class="field">
             <label class="label" for="ticketSol">Price in SOL</label>
-            <input id="ticketSol" v-model.number="form.ticketSol" class="input input--mono" type="number" step="0.001" min="0" >
+            <input
+              id="ticketSol"
+              v-model.number="form.ticketSol"
+              class="input input--mono"
+              type="number"
+              step="0.001"
+              min="0"
+            />
           </div>
           <div v-if="form.ticketAsset !== 'SOL'" class="field">
             <label class="label" for="ticketUsdc">Price in USDC</label>
-            <input id="ticketUsdc" v-model.number="form.ticketUsdc" class="input input--mono" type="number" step="0.5" min="0" >
+            <input
+              id="ticketUsdc"
+              v-model.number="form.ticketUsdc"
+              class="input input--mono"
+              type="number"
+              step="0.5"
+              min="0"
+            />
           </div>
         </div>
 
@@ -235,17 +256,26 @@ async function onSubmit() {
             :min="MIN_PAYOUT_BPS"
             :max="MAX_PAYOUT_BPS"
             step="100"
-          >
+          />
           <span class="hint">
-            The rest stays in the pot. Lower payouts survive more wins; higher payouts attract more challengers.
+            The rest stays in the pot. Lower payouts survive more wins; higher payouts attract more
+            challengers.
           </span>
         </div>
 
         <div class="field">
           <label class="label" for="duration">
-            Session length <span class="num">{{ Math.round(form.sessionDuration / 60 * 10) / 10 }} min</span>
+            Session length
+            <span class="num">{{ Math.round((form.sessionDuration / 60) * 10) / 10 }} min</span>
           </label>
-          <input id="duration" v-model.number="form.sessionDuration" type="range" min="30" max="900" step="30" >
+          <input
+            id="duration"
+            v-model.number="form.sessionDuration"
+            type="range"
+            min="30"
+            max="900"
+            step="30"
+          />
         </div>
 
         <div class="split">
@@ -260,7 +290,9 @@ async function onSubmit() {
 
       <div class="card actions">
         <div v-if="!wallet.isConnected" class="stack gap-2">
-          <p class="muted">Connect Phantom to mint. The transaction creates the NFT and its vault in one go.</p>
+          <p class="muted">
+            Connect Phantom to mint. The transaction creates the NFT and its vault in one go.
+          </p>
           <button class="btn btn--primary" @click="wallet.connect()">Connect Phantom</button>
         </div>
         <div v-else-if="!auth.isSignedIn" class="stack gap-2">
@@ -278,7 +310,9 @@ async function onSubmit() {
             <span v-else>Mint Kwami</span>
           </button>
           <p v-if="error" class="error-text">{{ error }}</p>
-          <p v-if="mintAddress" class="hint">Minted: <span class="num">{{ mintAddress }}</span></p>
+          <p v-if="mintAddress" class="hint">
+            Minted: <span class="num">{{ mintAddress }}</span>
+          </p>
         </div>
       </div>
     </div>
@@ -292,12 +326,26 @@ async function onSubmit() {
           <h3>{{ form.name || 'Unnamed' }}</h3>
           <p class="muted">{{ form.tagline || 'It is not saying.' }}</p>
         </div>
-        <hr class="divider" >
+        <hr class="divider" />
         <dl class="preview__facts">
-          <div><dt>Ticket</dt><dd class="num">{{ form.ticketAsset === 'USDC' ? `${form.ticketUsdc} USDC` : `${form.ticketSol} SOL` }}</dd></div>
-          <div><dt>Clock</dt><dd class="num">{{ Math.round(form.sessionDuration / 60 * 10) / 10 }} min</dd></div>
-          <div><dt>Payout</dt><dd class="num gold">{{ (form.payoutBps / 100).toFixed(0) }}%</dd></div>
-          <div><dt>Proof</dt><dd>{{ form.resolutionMode === 'commit-reveal' ? 'Commit–reveal' : 'Attested' }}</dd></div>
+          <div>
+            <dt>Ticket</dt>
+            <dd class="num">
+              {{ form.ticketAsset === 'USDC' ? `${form.ticketUsdc} USDC` : `${form.ticketSol} SOL` }}
+            </dd>
+          </div>
+          <div>
+            <dt>Clock</dt>
+            <dd class="num">{{ Math.round((form.sessionDuration / 60) * 10) / 10 }} min</dd>
+          </div>
+          <div>
+            <dt>Payout</dt>
+            <dd class="num gold">{{ (form.payoutBps / 100).toFixed(0) }}%</dd>
+          </div>
+          <div>
+            <dt>Proof</dt>
+            <dd>{{ form.resolutionMode === 'commit-reveal' ? 'Commit–reveal' : 'Attested' }}</dd>
+          </div>
         </dl>
       </div>
     </aside>
@@ -312,9 +360,16 @@ async function onSubmit() {
   align-items: start;
 }
 
-.mintpage__preview { position: sticky; top: calc(var(--header-h) + 24px); }
+.mintpage__preview {
+  position: sticky;
+  top: calc(var(--header-h) + 24px);
+}
 
-.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
 
 .chip {
   padding: 6px 14px;
@@ -326,10 +381,20 @@ async function onSubmit() {
   transition: all 0.15s ease;
 }
 
-.chip:hover { border-color: var(--border-strong); }
-.chip--on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--fg); }
+.chip:hover {
+  border-color: var(--border-strong);
+}
+.chip--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--fg);
+}
 
-.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
 
 .mode {
   display: flex;
@@ -346,8 +411,13 @@ async function onSubmit() {
   transition: all 0.15s ease;
 }
 
-.mode:hover { border-color: var(--border-strong); }
-.mode--on { border-color: var(--accent-line); background: var(--accent-soft); }
+.mode:hover {
+  border-color: var(--border-strong);
+}
+.mode--on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
 
 .split {
   display: flex;
@@ -359,9 +429,16 @@ async function onSubmit() {
   font-size: 0.86rem;
 }
 
-.actions { position: sticky; bottom: 16px; }
+.actions {
+  position: sticky;
+  bottom: 16px;
+}
 
-.preview { display: flex; flex-direction: column; gap: 14px; }
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
 .preview__stage {
   height: 220px;
@@ -370,16 +447,40 @@ async function onSubmit() {
   background: var(--bg-sunken);
 }
 
-.preview__facts { margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.preview__facts > div { display: flex; justify-content: space-between; gap: 12px; font-size: 0.88rem; }
-.preview__facts dt { color: var(--fg-dim); }
-.preview__facts dd { margin: 0; }
+.preview__facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.preview__facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+.preview__facts dt {
+  color: var(--fg-dim);
+}
+.preview__facts dd {
+  margin: 0;
+}
 
-input[type='range'] { accent-color: var(--accent); width: 100%; }
+input[type='range'] {
+  accent-color: var(--accent);
+  width: 100%;
+}
 
 @media (max-width: 960px) {
-  .mintpage { grid-template-columns: 1fr; }
-  .mintpage__preview { position: static; order: -1; }
-  .modes { grid-template-columns: 1fr; }
+  .mintpage {
+    grid-template-columns: 1fr;
+  }
+  .mintpage__preview {
+    position: static;
+    order: -1;
+  }
+  .modes {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

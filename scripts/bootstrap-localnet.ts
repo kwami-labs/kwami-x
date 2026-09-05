@@ -52,7 +52,11 @@ async function send(
 ) {
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
   const tx = new VersionedTransaction(
-    new TransactionMessage({ payerKey: payer.publicKey, recentBlockhash: blockhash, instructions }).compileToV0Message(),
+    new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message(),
   )
   tx.sign([payer, ...extraSigners])
   const signature = await connection.sendTransaction(tx)
@@ -121,7 +125,9 @@ if (await connection.getAccountInfo(configPda)) {
   console.log(`Oracle   ${oracle.publicKey.toBase58()}`)
   console.log(`\nAdd to .env:`)
   console.log(`NUXT_PUBLIC_USDC_MINT=${usdcMint.publicKey.toBase58()}`)
-  console.log(`NUXT_ORACLE_SECRET_KEY=<base58 of the oracle secret key — regenerate with scripts/gen-keys.ts>`)
+  console.log(
+    `NUXT_ORACLE_SECRET_KEY=<base58 of the oracle secret key — regenerate with scripts/gen-keys.ts>`,
+  )
 }
 
 console.log('\nDone.')

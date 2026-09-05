@@ -7,7 +7,13 @@ const { data, pending, refresh } = await useFetch('/api/kwami', {
   immediate: false,
 })
 
-watch(() => wallet.address, (address) => { if (address) refresh() }, { immediate: true })
+watch(
+  () => wallet.address,
+  (address) => {
+    if (address) refresh()
+  },
+  { immediate: true },
+)
 
 const mine = computed(() => data.value?.kwamis ?? [])
 </script>
@@ -24,7 +30,9 @@ const mine = computed(() => data.value?.kwamis ?? [])
 
     <div v-if="!wallet.isConnected" class="card stack gap-2">
       <p class="muted">Connect your wallet to see what you hold.</p>
-      <button class="btn btn--primary" style="align-self: flex-start" @click="wallet.connect()">Connect Phantom</button>
+      <button class="btn btn--primary" style="align-self: flex-start" @click="wallet.connect()">
+        Connect Phantom
+      </button>
     </div>
 
     <div v-else-if="pending" class="card"><p class="dim">Loading…</p></div>

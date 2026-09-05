@@ -139,7 +139,9 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
       <div v-if="play.phase.value === 'idle' || play.phase.value === 'error'" class="card stack gap-3">
         <div class="stack gap-1">
           <span class="eyebrow">Prize if you win</span>
-          <span class="num num--xl gold">{{ formatCents(kwami.value_cents * (kwami.payout_bps / 10000)) }}</span>
+          <span class="num num--xl gold">{{
+            formatCents(kwami.value_cents * (kwami.payout_bps / 10000))
+          }}</span>
         </div>
 
         <div v-if="kwami.ticket_price_lamports > 0 && kwami.ticket_price_usdc > 0" class="field">
@@ -148,15 +150,24 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
             <button class="chip" :class="{ 'chip--on': chosenAsset === 'SOL' }" @click="chosenAsset = 'SOL'">
               {{ formatSol(kwami.ticket_price_lamports) }}
             </button>
-            <button class="chip" :class="{ 'chip--on': chosenAsset === 'USDC' }" @click="chosenAsset = 'USDC'">
+            <button
+              class="chip"
+              :class="{ 'chip--on': chosenAsset === 'USDC' }"
+              @click="chosenAsset = 'USDC'"
+            >
               {{ formatUsdc(kwami.ticket_price_usdc) }}
             </button>
           </div>
         </div>
 
         <ul class="terms dim">
-          <li>{{ Math.round(kwami.session_duration / 60 * 10) / 10 }} minutes of voice, starting the moment the ticket confirms.</li>
-          <li>Say its phrase and {{ (kwami.payout_bps / 100).toFixed(0) }}% of the pot is transferred to you.</li>
+          <li>
+            {{ Math.round((kwami.session_duration / 60) * 10) / 10 }} minutes of voice, starting the moment
+            the ticket confirms.
+          </li>
+          <li>
+            Say its phrase and {{ (kwami.payout_bps / 100).toFixed(0) }}% of the pot is transferred to you.
+          </li>
           <li>Miss and your ticket stays in the pot for whoever comes next.</li>
         </ul>
 
@@ -167,12 +178,20 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
         <button v-else-if="!wallet.isConnected" class="btn btn--primary btn--block" @click="wallet.connect()">
           Connect Phantom
         </button>
-        <button v-else-if="!auth.isSignedIn" class="btn btn--primary btn--block" @click="auth.signInWithPhantom()">
+        <button
+          v-else-if="!auth.isSignedIn"
+          class="btn btn--primary btn--block"
+          @click="auth.signInWithPhantom()"
+        >
           Sign in with Phantom
         </button>
         <button v-else class="btn btn--gold btn--lg btn--block" @click="onStart">
           Pay
-          {{ chosenAsset === 'SOL' ? formatSol(kwami.ticket_price_lamports) : formatUsdc(kwami.ticket_price_usdc) }}
+          {{
+            chosenAsset === 'SOL'
+              ? formatSol(kwami.ticket_price_lamports)
+              : formatUsdc(kwami.ticket_price_usdc)
+          }}
           and start
         </button>
 
@@ -180,7 +199,10 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
       </div>
 
       <!-- ── Paying ───────────────────────────────────────────────────── -->
-      <div v-else-if="play.phase.value === 'paying' || play.phase.value === 'opening'" class="card stack gap-2">
+      <div
+        v-else-if="play.phase.value === 'paying' || play.phase.value === 'opening'"
+        class="card stack gap-2"
+      >
         <h3>{{ play.phase.value === 'paying' ? 'Confirm in Phantom' : 'Opening the room…' }}</h3>
         <p class="muted">The clock starts when the transaction confirms, not before.</p>
       </div>
@@ -188,7 +210,10 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
       <!-- ── Live ─────────────────────────────────────────────────────── -->
       <div v-else-if="play.phase.value === 'live'" class="card stack gap-2">
         <div class="row gap-2">
-          <span class="dot dot--pulse" :style="{ color: speech.listening.value ? 'var(--success)' : 'var(--warn)' }" />
+          <span
+            class="dot dot--pulse"
+            :style="{ color: speech.listening.value ? 'var(--success)' : 'var(--warn)' }"
+          />
           <span class="grow">{{ speech.listening.value ? 'Listening' : 'Not listening' }}</span>
           <button v-if="!speech.listening.value" class="btn btn--sm" @click="beginVoice">Enable mic</button>
         </div>
@@ -200,16 +225,23 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
       </div>
 
       <!-- ── Won ──────────────────────────────────────────────────────── -->
-      <div v-else-if="play.phase.value === 'won' || play.phase.value === 'claiming'" class="card stack gap-3 win">
+      <div
+        v-else-if="play.phase.value === 'won' || play.phase.value === 'claiming'"
+        class="card stack gap-3 win"
+      >
         <div class="stack gap-1">
           <span class="eyebrow gold">You said it</span>
           <h2 class="gold">{{ formatCents(kwami.value_cents * (kwami.payout_bps / 10000)) }}</h2>
           <p class="muted">
-            Matched on “<span class="num">{{ play.winSummary.value?.matchedText }}</span>”.
-            The pot is not yours until you claim it on chain.
+            Matched on “<span class="num">{{ play.winSummary.value?.matchedText }}</span
+            >”. The pot is not yours until you claim it on chain.
           </p>
         </div>
-        <button class="btn btn--gold btn--lg btn--block" :disabled="play.phase.value === 'claiming'" @click="play.claimWin()">
+        <button
+          class="btn btn--gold btn--lg btn--block"
+          :disabled="play.phase.value === 'claiming'"
+          @click="play.claimWin()"
+        >
           {{ play.phase.value === 'claiming' ? 'Claiming…' : 'Claim the pot' }}
         </button>
         <p v-if="play.error.value" class="error-text">{{ play.error.value }}</p>
@@ -259,11 +291,14 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border);
-  background: radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.05), transparent 70%), var(--bg-sunken);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.05), transparent 70%), var(--bg-sunken);
   transition: border-color 0.4s ease;
 }
 
-.play--urgent .play__stage { border-color: rgba(255, 92, 114, 0.4); }
+.play--urgent .play__stage {
+  border-color: rgba(255, 92, 114, 0.4);
+}
 
 .clock {
   position: absolute;
@@ -275,8 +310,16 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
   place-items: center;
 }
 
-.clock__ring { position: absolute; inset: 0; transform: rotate(-90deg); }
-.clock__track { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 5; }
+.clock__ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.clock__track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 5;
+}
 
 .clock__fill {
   fill: none;
@@ -284,12 +327,21 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
   stroke-width: 5;
   stroke-linecap: round;
   stroke-dasharray: 283;
-  transition: stroke-dashoffset 0.3s linear, stroke 0.4s ease;
+  transition:
+    stroke-dashoffset 0.3s linear,
+    stroke 0.4s ease;
 }
 
-.clock--urgent .clock__fill { stroke: var(--danger); }
-.clock__text { font-size: 0.95rem; font-weight: 600; }
-.clock--urgent .clock__text { color: var(--danger); }
+.clock--urgent .clock__fill {
+  stroke: var(--danger);
+}
+.clock__text {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.clock--urgent .clock__text {
+  color: var(--danger);
+}
 
 .caption {
   position: absolute;
@@ -307,7 +359,14 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
   text-align: center;
 }
 
-.terms { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; }
+.terms {
+  margin: 0;
+  padding-left: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.85rem;
+}
 
 .notice {
   padding: 11px 13px;
@@ -318,7 +377,10 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
   color: var(--fg-muted);
 }
 
-.win { border-color: rgba(245, 196, 81, 0.3); box-shadow: 0 0 60px -24px var(--gold); }
+.win {
+  border-color: rgba(245, 196, 81, 0.3);
+  box-shadow: 0 0 60px -24px var(--gold);
+}
 
 .chip {
   padding: 6px 14px;
@@ -329,10 +391,17 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
   font-size: 0.87rem;
 }
 
-.chip--on { background: var(--accent-soft); border-color: var(--accent-line); }
+.chip--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
 
 @media (max-width: 980px) {
-  .play { grid-template-columns: 1fr; }
-  .play__stage { height: 46vh; }
+  .play {
+    grid-template-columns: 1fr;
+  }
+  .play__stage {
+    height: 46vh;
+  }
 }
 </style>

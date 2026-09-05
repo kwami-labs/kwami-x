@@ -12,7 +12,11 @@
  * every transition is deterministic and testable.
  */
 import type { GameSession, SessionOutcome, TranscriptTurn } from '../types/kwami'
-import { DEFAULT_SESSION_DURATION_SECS, MAX_SESSION_DURATION_SECS, MIN_SESSION_DURATION_SECS } from './constants'
+import {
+  DEFAULT_SESSION_DURATION_SECS,
+  MAX_SESSION_DURATION_SECS,
+  MIN_SESSION_DURATION_SECS,
+} from './constants'
 import { findSecretInTranscript, type MatchOptions } from './secret'
 
 /** Seconds left before a session expires, floored at zero. */

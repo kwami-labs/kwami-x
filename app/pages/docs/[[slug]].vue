@@ -56,8 +56,21 @@ useSeoMeta({ title: () => `${data.value?.title ?? 'Docs'} — Kwami` })
   align-items: start;
 }
 
-.docs__nav { position: sticky; top: calc(var(--header-h) + 24px); display: flex; flex-direction: column; gap: 10px; }
-.docs__nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.docs__nav {
+  position: sticky;
+  top: calc(var(--header-h) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.docs__nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
 
 .docs__nav a {
   display: block;
@@ -68,28 +81,68 @@ useSeoMeta({ title: () => `${data.value?.title ?? 'Docs'} — Kwami` })
   transition: all 0.14s ease;
 }
 
-.docs__nav a:hover { background: var(--panel); color: var(--fg); }
-.docs__nav a.on { background: var(--accent-soft); color: var(--fg); }
+.docs__nav a:hover {
+  background: var(--panel);
+  color: var(--fg);
+}
+.docs__nav a.on {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
 
-.prose { max-width: 74ch; }
+.prose {
+  max-width: 74ch;
+}
 
 @media (max-width: 860px) {
-  .docs { grid-template-columns: 1fr; gap: 24px; }
-  .docs__nav { position: static; }
-  .docs__nav ul { flex-direction: row; flex-wrap: wrap; }
+  .docs {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .docs__nav {
+    position: static;
+  }
+  .docs__nav ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 }
 </style>
 
 <style>
 /* Unscoped: the markdown body is injected with v-html, so scoped attributes
    never reach it. Kept narrow so it cannot bleed into the rest of the app. */
-.prose h2 { margin: 2.2em 0 0.7em; font-size: 1.4rem; }
-.prose h3 { margin: 1.8em 0 0.6em; font-size: 1.08rem; }
-.prose h1 + div > h2:first-child { margin-top: 1em; }
-.prose p, .prose li { color: var(--fg-muted); line-height: 1.68; }
-.prose ul, .prose ol { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
-.prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-.prose strong { color: var(--fg); }
+.prose h2 {
+  margin: 2.2em 0 0.7em;
+  font-size: 1.4rem;
+}
+.prose h3 {
+  margin: 1.8em 0 0.6em;
+  font-size: 1.08rem;
+}
+.prose h1 + div > h2:first-child {
+  margin-top: 1em;
+}
+.prose p,
+.prose li {
+  color: var(--fg-muted);
+  line-height: 1.68;
+}
+.prose ul,
+.prose ol {
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose strong {
+  color: var(--fg);
+}
 
 .prose code {
   font-family: var(--font-mono);
@@ -109,7 +162,12 @@ useSeoMeta({ title: () => `${data.value?.title ?? 'Docs'} — Kwami` })
   line-height: 1.55;
 }
 
-.prose pre code { background: none; padding: 0; font-size: 0.8rem; color: var(--fg-muted); }
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
 
 .prose blockquote {
   margin: 1.4em 0;
@@ -118,8 +176,27 @@ useSeoMeta({ title: () => `${data.value?.title ?? 'Docs'} — Kwami` })
   color: var(--fg-muted);
 }
 
-.prose table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 1.4em 0; }
-.prose th, .prose td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
-.prose th { color: var(--fg-dim); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.08em; }
-.prose hr { border: 0; border-top: 1px solid var(--border); margin: 2.4em 0; }
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin: 1.4em 0;
+}
+.prose th,
+.prose td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.prose th {
+  color: var(--fg-dim);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 2.4em 0;
+}
 </style>

@@ -155,7 +155,9 @@ describe('secretHash', () => {
   })
 
   it('changes with the salt', async () => {
-    expect(await secretHash('the moon remembers', 'aa')).not.toBe(await secretHash('the moon remembers', 'bb'))
+    expect(await secretHash('the moon remembers', 'aa')).not.toBe(
+      await secretHash('the moon remembers', 'bb'),
+    )
   })
 
   it('is 64 hex characters', async () => {

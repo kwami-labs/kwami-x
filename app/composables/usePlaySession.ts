@@ -9,15 +9,7 @@ import { findConfigPda } from '#shared/solana/pda'
 import type { Asset, TranscriptTurn } from '#shared/types/kwami'
 
 export type PlayPhase =
-  | 'idle'
-  | 'paying'
-  | 'opening'
-  | 'live'
-  | 'won'
-  | 'claiming'
-  | 'claimed'
-  | 'expired'
-  | 'error'
+  'idle' | 'paying' | 'opening' | 'live' | 'won' | 'claiming' | 'claimed' | 'expired' | 'error'
 
 export interface PlayKwami {
   mint: string

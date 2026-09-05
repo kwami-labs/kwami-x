@@ -13,7 +13,9 @@ function personalSign(message: string, privateKey: Uint8Array): string {
 
 function addressOf(privateKey: Uint8Array): string {
   const pub = secp256k1.getPublicKey(privateKey, false)
-  return `0x${Buffer.from(keccak_256(pub.slice(1))).subarray(-20).toString('hex')}`
+  return `0x${Buffer.from(keccak_256(pub.slice(1)))
+    .subarray(-20)
+    .toString('hex')}`
 }
 
 describe('recoverEthAddress', () => {
@@ -40,7 +42,8 @@ describe('recoverEthAddress', () => {
   it('accepts a legacy v of 0 or 1 as well as 27 or 28', () => {
     const message = 'hello'
     const signature = personalSign(message, key)
-    const legacy = signature.slice(0, -2) + (parseInt(signature.slice(-2), 16) - 27).toString(16).padStart(2, '0')
+    const legacy =
+      signature.slice(0, -2) + (parseInt(signature.slice(-2), 16) - 27).toString(16).padStart(2, '0')
     expect(recoverEthAddress(message, legacy)).toBe(address)
   })
 
