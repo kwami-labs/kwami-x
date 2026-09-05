@@ -64,6 +64,7 @@ export default defineConfig({
         // WebGL and WebAudio, neither of which happy-dom implements. Covered
         // instead by asserting the preset table in tests/integration.
         'app/utils/kwami-renderer.ts',
+        'app/utils/kwami-field.ts',
         'app/utils/audio-meter.ts',
       ],
       /**

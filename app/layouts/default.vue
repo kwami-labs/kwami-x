@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const route = useRoute()
+const gate = useAuthGate()
 
 const nav = [
   { to: '/', label: 'Arena' },
@@ -40,6 +41,10 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
     <main class="main">
       <slot />
     </main>
+
+    <ClientOnly>
+      <AuthModal v-if="gate.open.value" :dismissible="gate.dismissible.value" @close="gate.dismiss()" />
+    </ClientOnly>
 
     <footer class="footer">
       <div class="wrap footer__inner">

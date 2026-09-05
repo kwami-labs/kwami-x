@@ -99,14 +99,14 @@ describe('paletteFromMint', () => {
     expect(paletteFromMint('aaa').a).not.toBe(paletteFromMint('zzz').a)
   })
 
-  it('produces two distinct, legible hues', () => {
+  it('produces two distinct hex colours the renderer can actually parse', () => {
+    // This assertion used to pin `hsl(h s% l%)`. That form is valid CSS and
+    // unparseable by Three.js, whose colour regex is comma-separated — so it
+    // fell back to white and every Kwami rendered as a grey rock in WebGL while
+    // looking correct in the stylesheet. Hex is what all three consumers read.
     const { a, b } = paletteFromMint('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU')
-    // Comma form, not CSS Color 4's space form. This assertion used to demand the space form
-    // and so pinned in the bug that rendered every avatar white: three.js cannot parse it.
-    // tests/unit/palette.test.ts asserts the property that actually matters — that a real
-    // THREE.Color parses these to something other than white.
-    expect(a).toMatch(/^hsl\(\d+, \d+%, \d+%\)$/)
-    expect(b).toMatch(/^hsl\(\d+, \d+%, \d+%\)$/)
+    expect(a).toMatch(/^#[0-9a-f]{6}$/)
+    expect(b).toMatch(/^#[0-9a-f]{6}$/)
     expect(a).not.toBe(b)
   })
 })

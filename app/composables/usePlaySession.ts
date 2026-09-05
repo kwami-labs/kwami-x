@@ -41,6 +41,9 @@ interface ClaimMaterial {
 export function usePlaySession(kwami: Ref<PlayKwami | null>) {
   const wallet = useWalletStore()
   const config = useRuntimeConfig()
+  // Every /api/session route is behind `requireUser`, so these calls have to
+  // carry the Supabase token; a bare `$fetch` gets a 401.
+  const api = useApi()
 
   const phase = ref<PlayPhase>('idle')
   const error = ref<string | null>(null)
@@ -138,7 +141,7 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
       await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed')
 
       phase.value = 'opening'
-      const result = await $fetch<{
+      const result = await api<{
         session: { id: string; nonce: number; startedAt: number; expiresAt: number; room: string }
       }>('/api/session/start', {
         method: 'POST',
@@ -164,7 +167,7 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
     const at = Math.max(0, Date.now() - startedAt.value * 1000)
     transcript.value.push({ role: 'player', text, at, confidence })
 
-    const result = await $fetch<{
+    const result = await api<{
       won: boolean
       score?: number
       matchedText?: string
@@ -189,7 +192,7 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
     if (!sessionId.value) return null
     const at = Math.max(0, Date.now() - startedAt.value * 1000)
     try {
-      const { text } = await $fetch<{ text: string }>(`/api/session/${sessionId.value}/reply`, {
+      const { text } = await api<{ text: string }>(`/api/session/${sessionId.value}/reply`, {
         method: 'POST',
         body: { utterance, at },
       })
@@ -271,7 +274,7 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
 
       claimSignature.value = signature
       phase.value = 'claimed'
-      void $fetch(`/api/session/${sessionId.value}/claimed`, { method: 'POST', body: { signature } })
+      void api(`/api/session/${sessionId.value}/claimed`, { method: 'POST', body: { signature } })
       void wallet.refreshBalances()
     } catch (e) {
       phase.value = 'won'

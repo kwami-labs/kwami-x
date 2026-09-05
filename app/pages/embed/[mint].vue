@@ -10,7 +10,7 @@ const { data } = await useFetch<KwamiDetailResponse>(`/api/kwami/${mint.value}`)
 const kwami = computed(() => data.value?.kwami ?? null)
 
 const palette = computed(() => {
-  const derived = paletteFromMint(mint.value)
+  const derived = paletteFor(kwami.value ?? { mint: mint.value })
   // A host site can retint the Kwami to fit its own design without losing the
   // silhouette that makes it recognisable.
   return {

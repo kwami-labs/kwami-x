@@ -15,7 +15,7 @@ const wallet = useWalletStore()
 const auth = useAuthStore()
 const play = usePlaySession(kwami as never)
 
-const palette = computed(() => paletteFromMint(mint.value))
+const palette = computed(() => paletteFor(kwami.value ?? { mint: mint.value }))
 const chosenAsset = ref<Asset>('SOL')
 const micError = ref<string | null>(null)
 const level = ref(0)
