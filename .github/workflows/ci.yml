@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-workspace
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
 
       - name: Lint
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
 
       # Coverage runs the same tests plus the ratchet in vitest.config.ts — not both.
@@ -83,7 +83,7 @@ jobs:
       - name: CI scripts (node:test)
         run: bun run test:ci-scripts
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage
@@ -97,7 +97,7 @@ jobs:
     # The vault holds every Kwami's pot. It has to compile, lint clean and pass its own
     # tests before anything that talks to it is allowed to ship.
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -137,7 +137,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
 
       - name: Build
@@ -153,7 +153,7 @@ jobs:
             echo "Output is $(du -sh .output | cut -f1) across $(find .output -type f | wc -l) files."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: output
           path: .output/
