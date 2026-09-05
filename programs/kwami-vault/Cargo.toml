@@ -1,6 +1,6 @@
 [package]
 name = "kwami-vault"
-version = "3.0.0"
+version = "3.1.0"
 description = "Kwami v3 vault: ticketed voice challenges with on-chain pots, commit-reveal wins and pluggable game extensions."
 edition = "2021"
 license = "Apache-2.0"
