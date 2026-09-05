@@ -68,6 +68,7 @@ The middleware also sets `Permissions-Policy` allowing only the microphone — t
 
 ## Not yet done
 
+- **The program has never been compiled.** There is no Rust toolchain in this environment, so `programs/` has been written and reviewed by reading but never put through `cargo`, `anchor build`, or a validator. A careful read found and fixed three real defects — a direct lamport debit from a system-owned PDA (which the runtime rejects outright), a borrow-checker conflict in the settlement path, and a self-referential seeds constraint — but reading is not compiling, and there will be more. Build it before trusting any of it.
 - The program has not been audited. Do not deploy it to mainnet with real money.
 - `record_valuation` is a single-signer push. A production deployment should use a price feed with staleness and confidence bounds.
 - There is no rate limiting on `/api/auth/nonce`. It is cheap, but it is unbounded.

@@ -239,6 +239,9 @@ function claimWinKeys(args: ClaimWinArgs, program: PublicKey) {
       ? { pubkey: deriveAssociatedTokenAddress(usdc, args.player), isSigner: false, isWritable: true }
       : none,
     usdc ? { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false } : none,
+    // The vault is a system-owned PDA, so paying a winner is a CPI to the
+    // System Program rather than a direct lamport write. Not optional.
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
   ]
 }
 

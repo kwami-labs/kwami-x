@@ -215,10 +215,22 @@ describe('claimWinRevealIx', () => {
       nonce: 0n,
       preimage: new Uint8Array([1]),
     })
-    expect(ix.keys.length).toBe(9)
-    for (const key of ix.keys.slice(5)) {
+    expect(ix.keys.length).toBe(10)
+    for (const key of ix.keys.slice(5, 9)) {
       expect(key.pubkey.equals(ix.programId)).toBe(true)
     }
+  })
+
+  it('always passes the System Program, since the vault payout is a CPI', async () => {
+    // The vault is system-owned, so the program cannot debit it directly.
+    // Omitting this account makes every win fail at settlement.
+    const ix = await claimWinRevealIx({
+      mint: MINT,
+      player: CREATOR,
+      nonce: 0n,
+      preimage: new Uint8Array([1]),
+    })
+    expect(ix.keys[9]!.pubkey.toBase58()).toBe(SystemProgram.programId.toBase58())
   })
 
   it('uses real token accounts when a USDC mint is supplied', async () => {
@@ -229,16 +241,17 @@ describe('claimWinRevealIx', () => {
       preimage: new Uint8Array([1]),
       usdcMint: USDC,
     })
-    expect(ix.keys[5].pubkey.toBase58()).toBe(USDC.toBase58())
-    expect(ix.keys[8].pubkey.toBase58()).toBe(TOKEN_PROGRAM_ID.toBase58())
+    expect(ix.keys[5]!.pubkey.toBase58()).toBe(USDC.toBase58())
+    expect(ix.keys[8]!.pubkey.toBase58()).toBe(TOKEN_PROGRAM_ID.toBase58())
+    expect(ix.keys[9]!.pubkey.toBase58()).toBe(SystemProgram.programId.toBase58())
   })
 })
 
 describe('claimWinAttestedIx', () => {
   it('appends the instructions sysvar, which the program reads the signature back from', async () => {
     const ix = await claimWinAttestedIx({ mint: MINT, player: CREATOR, nonce: 0n, validUntil: 1_800_000_000n })
-    expect(ix.keys.length).toBe(10)
-    expect(ix.keys[9].pubkey.toBase58()).toBe('Sysvar1nstructions1111111111111111111111111')
+    expect(ix.keys.length).toBe(11)
+    expect(ix.keys[10]!.pubkey.toBase58()).toBe('Sysvar1nstructions1111111111111111111111111')
   })
 
   it('refuses to build without a deadline', async () => {
