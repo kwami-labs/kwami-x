@@ -30,5 +30,5 @@ custom-panic = []
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
 
 [dependencies]
-anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-lang = { version = "1.1.2", features = ["init-if-needed"] }
 anchor-spl = "0.31.1"
