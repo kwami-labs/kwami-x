@@ -1,6 +1,6 @@
-import { Keypair, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction } from '@solana/web3.js'
+import { Keypair, PublicKey, TransactionMessage, VersionedTransaction } from '@solana/web3.js'
 import { createKwamiIx } from '#shared/solana/instructions'
-import { createMetadataV3Ix, MAX_NAME_LENGTH } from '#shared/solana/token-metadata'
+import { buildMintInstructions } from '~/utils/mint-instructions'
 import { SECONDARY_ROYALTY_BPS } from '#shared/game/constants'
 import type { KwamiRenderer, ResolutionMode } from '#shared/types/kwami'
 
@@ -85,17 +85,10 @@ export function useMintKwami() {
 
       // --- 2. Build the bundle.
       phase.value = 'building'
-      const {
-        createAssociatedTokenAccountInstruction,
-        createInitializeMint2Instruction,
-        createMintToInstruction,
-        createSetAuthorityInstruction,
-        getAssociatedTokenAddressSync,
-        getMinimumBalanceForRentExemptMint,
-        AuthorityType,
-        MINT_SIZE,
-        TOKEN_PROGRAM_ID,
-      } = await import('@solana/spl-token')
+      // Loaded lazily: spl-token pulls a large graph that a visitor who never mints
+      // should not pay for.
+      const splToken = await import('@solana/spl-token')
+      const { getAssociatedTokenAddressSync, getMinimumBalanceForRentExemptMint } = splToken
 
       const connection = wallet.rpc()
       const mintKeypair = Keypair.generate()
@@ -103,36 +96,15 @@ export function useMintKwami() {
       const rent = await getMinimumBalanceForRentExemptMint(connection)
       const creatorAta = getAssociatedTokenAddressSync(mint, creator)
 
-      const instructions = [
-        SystemProgram.createAccount({
-          fromPubkey: creator,
-          newAccountPubkey: mint,
-          space: MINT_SIZE,
-          lamports: rent,
-          programId: TOKEN_PROGRAM_ID,
-        }),
-        // Zero decimals and a supply of one is what makes this a non-fungible
-        // token rather than a currency.
-        createInitializeMint2Instruction(mint, 0, creator, creator),
-        createAssociatedTokenAccountInstruction(creator, creatorAta, creator, mint),
-        createMintToInstruction(mint, creatorAta, creator, 1),
-        // Metadata must be created while `creator` still holds mint authority,
-        // which the next instruction revokes. Without this the token is a
-        // number in a ledger: "Unknown Token" in Phantom, and unlistable on
-        // every marketplace.
-        createMetadataV3Ix({
-          mint,
-          creator,
-          name: draft.name.slice(0, MAX_NAME_LENGTH),
-          symbol: 'KWAMI',
-          uri: `${config.public.siteUrl}/api/kwami/${mint.toBase58()}/metadata`,
-          sellerFeeBasisPoints: SECONDARY_ROYALTY_BPS,
-        }),
-        // Revoking the mint authority is what makes the NFT provably unique —
-        // without it the author could mint a second copy of the same Kwami at
-        // any time and the scarcity claim would be worthless.
-        createSetAuthorityInstruction(mint, creator, AuthorityType.MintTokens, null),
-        await createKwamiIx({
+      const instructions = buildMintInstructions({
+        creator,
+        mint,
+        creatorAta,
+        rent,
+        name: draft.name,
+        metadataUri: `${config.public.siteUrl}/api/kwami/${mint.toBase58()}/metadata`,
+        sellerFeeBasisPoints: SECONDARY_ROYALTY_BPS,
+        createKwamiIx: await createKwamiIx({
           mint,
           creator,
           secretHash,
@@ -143,7 +115,8 @@ export function useMintKwami() {
           resolutionMode: draft.resolutionMode,
           program: new PublicKey(config.public.kwamiProgramId as string),
         }),
-      ]
+        splToken,
+      })
 
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
       const message = new TransactionMessage({
