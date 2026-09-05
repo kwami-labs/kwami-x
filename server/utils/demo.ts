@@ -209,7 +209,23 @@ function pseudoBase58(seed: string, length: number): string {
   return out
 }
 
-export function demoSessions(kwami: DemoKwami, limit = 12): DemoSession[] {
+/**
+ * The clock the demo ledger is drawn against, quantised to the hour.
+ *
+ * The feed has to stay *relative* — a profile whose newest challenge is dated
+ * to a fixed instant reads as "two years ago" a year from now — but it also has
+ * to be stable, and `Date.now()` is neither. Two calls a millisecond apart
+ * produced two different ledgers for the same Kwami, which is the sort of thing
+ * that turns into an SSR/hydration mismatch rather than an obvious bug.
+ *
+ * Rounding to the hour gives both: the rows are spaced ninety minutes apart, so
+ * hour granularity is finer than anything the relative labels can show.
+ */
+function hourBucket(now: number): number {
+  return Math.floor(now / 3_600_000) * 3_600_000
+}
+
+export function demoSessions(kwami: DemoKwami, limit = 12, now = Date.now()): DemoSession[] {
   const total = Math.min(kwami.sessions_played, limit)
   const usesUsdc = kwami.ticket_price_usdc > 0 && kwami.ticket_price_lamports === 0
   const out: DemoSession[] = []
@@ -224,7 +240,7 @@ export function demoSessions(kwami: DemoKwami, limit = 12): DemoSession[] {
       outcome: won ? 'won' : i % 5 === 0 ? 'expired' : 'lost',
       asset: usesUsdc ? 'USDC' : 'SOL',
       ticket_amount: usesUsdc ? kwami.ticket_price_usdc : kwami.ticket_price_lamports,
-      started_at: new Date(Date.now() - (i + 1) * 5_400_000).toISOString(),
+      started_at: new Date(hourBucket(now) - (i + 1) * 5_400_000).toISOString(),
       payout_lamports: won ? kwami.prize_lamports : 0,
       payout_usdc: won ? kwami.prize_usdc : 0,
       player_wallet: pseudoBase58(`${seed}:wallet`, 44),

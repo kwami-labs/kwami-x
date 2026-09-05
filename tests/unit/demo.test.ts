@@ -110,7 +110,18 @@ describe('demoSessions', () => {
 
   it('is deterministic for a given mint', () => {
     const k = DEMO_KWAMIS[0]!
-    expect(demoSessions(k)).toEqual(demoSessions(k))
+    // An explicit clock, so this asserts determinism rather than racing the
+    // hour boundary the default is rounded to.
+    const now = Date.parse('2026-09-05T12:34:56.789Z')
+    expect(demoSessions(k, 12, now)).toEqual(demoSessions(k, 12, now))
+  })
+
+  it('does not change within the hour', () => {
+    // The ledger is rendered on the server and again on the client. Two calls
+    // seconds apart returning different timestamps is a hydration mismatch.
+    const k = DEMO_KWAMIS[0]!
+    const base = Date.parse('2026-09-05T12:00:00.000Z')
+    expect(demoSessions(k, 12, base)).toEqual(demoSessions(k, 12, base + 59 * 60_000))
   })
 })
 
