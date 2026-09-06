@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { RENDERER_PRESETS } from '~/utils/kwami-renderer'
+import { RENDERER_PRESETS, resolveRendererParams } from '~/utils/kwami-renderer'
+import { TUNING_RANGES, readTuning, toAppearance } from '#shared/kwami/appearance'
+import { KWAMI_LOOKS } from '#shared/kwami/looks'
 import type { KwamiRenderer } from '#shared/types/kwami'
 
 const NAMES: KwamiRenderer[] = ['blob-xyz', 'crystal-ball', 'orbital-shards', 'stars-genesis', 'black-hole']
@@ -32,5 +34,99 @@ describe('renderer presets', () => {
       (p) => `${p.amplitude}:${p.frequency}:${p.particles}`,
     )
     expect(new Set(signatures).size).toBe(signatures.length)
+  })
+})
+
+describe('tuning ranges', () => {
+  it('names only parameters the renderer actually has', () => {
+    // `TUNING_RANGES` lives in `shared/` and the presets live in `app/`, so
+    // nothing but this test stops a slider being added for a uniform the
+    // shader does not read — it would move, and the Kwami would not.
+    const params = Object.keys(RENDERER_PRESETS['blob-xyz'])
+    for (const key of Object.keys(TUNING_RANGES)) {
+      expect(params, key).toContain(key)
+    }
+  })
+
+  it('contains every preset inside the slider it will be edited with', () => {
+    // Opening "Fine tune" on a body whose preset sits outside its own track
+    // shows a slider pinned to one end, and the first drag silently snaps the
+    // Kwami to a value nobody chose. Either the range is wrong or the preset
+    // is; both are bugs, and this is where they surface.
+    for (const [name, preset] of Object.entries(RENDERER_PRESETS)) {
+      for (const [key, range] of Object.entries(TUNING_RANGES)) {
+        const value = preset[key as keyof typeof preset]
+        expect(value, `${name}.${key}`).toBeGreaterThanOrEqual(range.min)
+        expect(value, `${name}.${key}`).toBeLessThanOrEqual(range.max)
+      }
+    }
+  })
+
+  it('reads a stored override back as the renderer would apply it', () => {
+    // The round trip the studio depends on: what `toAppearance` writes at mint
+    // is what `readTuning` hands the renderer on the profile page.
+    const stored = toAppearance({ a: '#7c5cff', b: '#3ddc97' }, { spin: 0.4, particles: 300 })
+    expect(readTuning(stored)).toEqual({ spin: 0.4, particles: 300 })
+  })
+})
+
+describe('resolveRendererParams', () => {
+  it('gives back the body preset when nothing is tuned', () => {
+    for (const name of NAMES) {
+      expect(resolveRendererParams(name)).toEqual(RENDERER_PRESETS[name])
+    }
+  })
+
+  it('changes every parameter when the body changes', () => {
+    // The bug this exists for: the preview was read once at mount and never
+    // again, so clicking a different body updated the label and left the mesh
+    // exactly as it was. Switching has to actually move the numbers.
+    const blob = resolveRendererParams('blob-xyz')
+    const hole = resolveRendererParams('black-hole')
+    expect(hole.amplitude).not.toBe(blob.amplitude)
+    expect(hole.frequency).not.toBe(blob.frequency)
+    expect(hole.particles).not.toBe(blob.particles)
+  })
+
+  it('lays the creator overrides on top of the preset', () => {
+    const tuned = resolveRendererParams('blob-xyz', { spin: 0.5 })
+    expect(tuned.spin).toBe(0.5)
+    // Untouched parameters still come from the preset, not from a default.
+    expect(tuned.amplitude).toBe(RENDERER_PRESETS['blob-xyz'].amplitude)
+  })
+
+  it('carries overrides across a body change', () => {
+    // Someone who slowed their Kwami down and then tried a different body meant
+    // to keep it slow; silently restoring the preset's spin would undo a
+    // deliberate choice on an unrelated click.
+    const tuning = { spin: 0.5 }
+    expect(resolveRendererParams('crystal-ball', tuning).spin).toBe(0.5)
+    expect(resolveRendererParams('stars-genesis', tuning).spin).toBe(0.5)
+  })
+
+  it('ignores junk rather than poisoning a uniform with it', () => {
+    // NaN in `uAmplitude` does not throw — it renders nothing at all, which is
+    // a very hard failure to trace back to a slider.
+    const params = resolveRendererParams('blob-xyz', {
+      amplitude: Number.NaN,
+      frequency: undefined as unknown as number,
+    })
+    expect(params.amplitude).toBe(RENDERER_PRESETS['blob-xyz'].amplitude)
+    expect(params.frequency).toBe(RENDERER_PRESETS['blob-xyz'].frequency)
+  })
+
+  it('falls back to a real body for an unknown name', () => {
+    // A Kwami minted with a renderer this build does not know must still
+    // render something rather than crashing on an undefined preset.
+    expect(resolveRendererParams('not-a-body' as never)).toEqual(RENDERER_PRESETS['blob-xyz'])
+  })
+
+  it('applies a look end to end, from the table to the uniforms', () => {
+    for (const look of KWAMI_LOOKS) {
+      const params = resolveRendererParams(look.renderer, look.tuning)
+      for (const [key, value] of Object.entries(look.tuning)) {
+        expect(params[key as keyof typeof params], `${look.id}.${key}`).toBe(value)
+      }
+    }
   })
 })

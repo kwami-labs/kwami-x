@@ -81,6 +81,18 @@ export const useAuthStore = defineStore('auth', () => {
     throw new Error(message)
   }
 
+  /** Prefer the server's statusMessage over ofetch's noisy wrapper. */
+  function describeAuthError(e: unknown): string {
+    const err = e as {
+      data?: { statusMessage?: string; message?: string }
+      statusMessage?: string
+      message?: string
+    }
+    return (
+      err.data?.statusMessage || err.data?.message || err.statusMessage || err.message || 'Sign-in failed.'
+    )
+  }
+
   /**
    * Prove the connected Solana address belongs to this account and store it.
    *
@@ -113,7 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) {
       // A refused signature is a choice, not a fault. The user stays signed in
       // and simply has no payout address on file until they agree to prove one.
-      error.value = (e as Error).message
+      error.value = describeAuthError(e)
       return false
     }
   }
@@ -155,6 +167,17 @@ export const useAuthStore = defineStore('auth', () => {
       email,
       password,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
+    if (e) fail(e.message)
+    loading.value = false
+  }
+
+  /** Email a one-time reset link; the user lands back on `/auth/callback`. */
+  async function resetPassword(email: string) {
+    loading.value = true
+    error.value = null
+    const { error: e } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback`,
     })
     if (e) fail(e.message)
     loading.value = false
@@ -223,7 +246,7 @@ export const useAuthStore = defineStore('auth', () => {
       session.value = data.session
       user.value = data.user
     } catch (e) {
-      error.value = (e as Error).message
+      error.value = describeAuthError(e)
       throw e
     } finally {
       loading.value = false
@@ -282,7 +305,7 @@ export const useAuthStore = defineStore('auth', () => {
       session.value = data.session
       user.value = data.user
     } catch (e) {
-      error.value = (e as Error).message
+      error.value = describeAuthError(e)
       throw e
     } finally {
       loading.value = false
@@ -308,6 +331,7 @@ export const useAuthStore = defineStore('auth', () => {
     init,
     signInWithEmail,
     signUpWithEmail,
+    resetPassword,
     signInWithPhone,
     verifyPhone,
     signInWithOAuth,

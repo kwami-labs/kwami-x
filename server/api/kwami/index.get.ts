@@ -3,7 +3,7 @@ import { DEMO_KWAMIS, isDemoMode } from '~~/server/utils/demo'
 import { serviceClient } from '~~/server/utils/supabase'
 
 const Query = z.object({
-  state: z.enum(['live', 'paused', 'cracked', 'dead', 'all']).default('live'),
+  state: z.enum(['live', 'paused', 'starving', 'cracked', 'dead', 'all']).default('live'),
   limit: z.coerce.number().int().min(1).max(60).default(24),
   offset: z.coerce.number().int().min(0).default(0),
   owner: z.string().optional(),

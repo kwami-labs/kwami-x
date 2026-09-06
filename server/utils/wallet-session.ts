@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { H3Event } from 'h3'
+import { resolveSupabaseUrl } from '#shared/config/supabase'
 import { serviceClient } from './supabase'
 import { toChecksumAddress } from './eth'
 
@@ -82,12 +83,16 @@ export async function issueWalletSession(event: H3Event, input: WalletSessionInp
     throw createError2(linkError?.message ?? 'Could not issue a session.')
   }
 
-  // Redeem with an anon client: `verifyOtp` returns a session only for a
-  // client that does not already hold service-role credentials.
-  const anon = createClient(config.public.supabaseUrl as string, config.public.supabaseAnonKey as string, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-  const { data: verified, error: verifyError } = await anon.auth.verifyOtp({
+  // Redeem with a publishable-key client: `verifyOtp` returns a session only
+  // for a client that does not already hold secret-key credentials.
+  const publishable = createClient(
+    resolveSupabaseUrl(config),
+    config.public.supabasePublishableKey as string,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    },
+  )
+  const { data: verified, error: verifyError } = await publishable.auth.verifyOtp({
     token_hash: link.properties.hashed_token,
     type: 'email',
   })

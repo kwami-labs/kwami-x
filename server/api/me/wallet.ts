@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { requireUser, serviceClient } from '~~/server/utils/supabase'
-import { verifySignedSiws } from '~~/server/utils/siws-verify'
+import { siwsExpectedDomains, verifySignedSiws } from '~~/server/utils/siws-verify'
 import { isDemoMode } from '~~/server/utils/demo'
 
 const Body = z.object({
@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = Body.parse(await readBody(event))
-  const { address } = await verifySignedSiws(body)
+  const { address } = await verifySignedSiws(body, { expectedDomains: siwsExpectedDomains(event) })
   const lookupKey = address.toLowerCase()
 
   const { data: existing } = await db

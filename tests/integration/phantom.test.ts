@@ -5,9 +5,11 @@ import {
   isMobileBrowser,
   isPhantomInstalled,
   isUserRejection,
+  normalizeSignInOutput,
   phantomDeeplink,
   waitForPhantom,
 } from '~/utils/phantom'
+import { PublicKey } from '@solana/web3.js'
 
 describe('provider detection', () => {
   beforeEach(() => {
@@ -33,6 +35,52 @@ describe('provider detection', () => {
   it('reports nothing when no wallet is present', () => {
     expect(getPhantomProvider()).toBeNull()
     expect(isPhantomInstalled()).toBe(false)
+  })
+})
+
+describe('normalizeSignInOutput', () => {
+  const message = 'x.kwami.io wants you to sign in with your Solana account:\naddr'
+  const signature = new Uint8Array(64).fill(7)
+  const key = PublicKey.unique()
+
+  it('reads Phantom PublicKey address shape', () => {
+    const out = normalizeSignInOutput({
+      address: key,
+      signedMessage: new TextEncoder().encode(message),
+      signature,
+    })
+    expect(out.address).toBe(key.toBase58())
+    expect(out.message).toBe(message)
+    expect(out.signature).toEqual(signature)
+  })
+
+  it('reads a base58 address string', () => {
+    const out = normalizeSignInOutput({
+      address: key.toBase58(),
+      signedMessage: message,
+      signature,
+    })
+    expect(out.address).toBe(key.toBase58())
+    expect(out.message).toBe(message)
+  })
+
+  it('reads the wallet-standard account shape', () => {
+    const out = normalizeSignInOutput({
+      account: { address: key.toBase58() },
+      signedMessage: new TextEncoder().encode(message),
+      signature: Array.from(signature),
+    })
+    expect(out.address).toBe(key.toBase58())
+    expect(out.signature).toEqual(signature)
+  })
+
+  it('throws when Phantom returns nothing usable', () => {
+    expect(() =>
+      normalizeSignInOutput({
+        signedMessage: message,
+        signature,
+      }),
+    ).toThrow(/no address/i)
   })
 })
 

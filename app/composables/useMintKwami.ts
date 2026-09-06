@@ -20,6 +20,14 @@ export interface MintDraft {
   sessionDuration: number
   payoutBps: number
   resolutionMode: ResolutionMode
+  /**
+   * Energy bought with the mint, in lamports.
+   *
+   * Paid to the same treasury as the commission and in the same shape — a plain
+   * transfer — so the server can credit it from the one transaction it already
+   * verifies. Zero is allowed: a Kwami can be minted dry and fuelled later.
+   */
+  fuelLamports?: bigint
 }
 
 export type MintPhase = 'idle' | 'committing' | 'building' | 'signing' | 'confirming' | 'done' | 'error'
@@ -134,6 +142,34 @@ export function useMintKwami() {
             fromPubkey: creator,
             toPubkey: new PublicKey(treasury),
             lamports: commission,
+          }),
+        )
+      }
+
+      /**
+       * The opening tank of energy, as its own transfer.
+       *
+       * A separate instruction from the commission rather than one merged
+       * total, for the reason the commission is a transfer in the first place:
+       * Phantom decodes each one, so the creator approves a prompt that says
+       * "0.5 SOL to <treasury>" *and* "0.2 SOL to <treasury>" rather than a
+       * single number they have to take apart themselves. Two lines they can
+       * check against the two the page quoted them.
+       *
+       * Appended after the commission so the server can tell them apart by
+       * subtraction, and last overall so a failure anywhere earlier in the
+       * bundle costs the creator nothing.
+       *
+       * An empty treasury adds nothing at all — the same posture the commission
+       * takes, so a fresh clone on devnet still mints.
+       */
+      const fuel = draft.fuelLamports ?? 0n
+      if (fuel > 0n && treasury) {
+        instructions.push(
+          SystemProgram.transfer({
+            fromPubkey: creator,
+            toPubkey: new PublicKey(treasury),
+            lamports: fuel,
           }),
         )
       }

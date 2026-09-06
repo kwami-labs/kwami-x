@@ -142,10 +142,21 @@ export function paletteFor(kwami: {
   return paletteFromMint(kwami.mint ?? '')
 }
 
-/** Normalise a chosen palette for storage. Returns `{}` when it is not usable. */
-export function toAppearance(palette: Partial<Palette>): Record<string, string> {
+/**
+ * Normalise a chosen appearance for storage. Returns `{}` when it is not usable.
+ *
+ * The palette is all-or-nothing and the tuning is not; see `readTuning` for why
+ * the two are treated differently.
+ */
+export function toAppearance(
+  palette: Partial<Palette>,
+  tuning?: Partial<KwamiTuning> | null,
+): Record<string, unknown> {
   if (!isHexColor(palette.a) || !isHexColor(palette.b)) return {}
-  return { colorA: palette.a, colorB: palette.b }
+  const cleaned = toTuning(tuning)
+  return cleaned
+    ? { colorA: palette.a, colorB: palette.b, tuning: cleaned }
+    : { colorA: palette.a, colorB: palette.b }
 }
 
 /**
@@ -160,4 +171,93 @@ export function suggestPalette(seed: string): NamedPalette {
   let hash = 0
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   return KWAMI_PALETTES[hash % KWAMI_PALETTES.length]!
+}
+
+/**
+ * Renderer tuning, on top of the body's preset.
+ *
+ * The five bodies are parameter sets over one shader, not five pipelines — so
+ * the parameters were always the real design space and the five names were only
+ * ever five good points inside it. This exposes the space itself: a creator
+ * picks the body that is closest and then moves it.
+ *
+ * Every field is optional, and an absent field means "whatever the preset
+ * says". Storing only the overrides rather than a full snapshot matters,
+ * because a Kwami minted today should still benefit if a preset is ever
+ * retuned — a stored copy of the defaults would freeze that Kwami on the old
+ * numbers forever, which is not what anyone chose.
+ *
+ * Lives in `appearance`, which is already `jsonb` and already untyped, so none
+ * of this needs a migration.
+ */
+export interface KwamiTuning {
+  /** Base displacement amplitude — how far the surface moves at rest. */
+  amplitude: number
+  /** Noise frequency. High reads as crystalline, low as liquid. */
+  frequency: number
+  /** How hard audio pushes the surface. */
+  reactivity: number
+  /** Rotation speed, radians per second. */
+  spin: number
+  /** Rim light power; higher is a tighter, brighter edge. */
+  rimPower: number
+  /** Sparks orbiting the core. */
+  particles: number
+}
+
+/**
+ * The bounds each tunable is clamped into.
+ *
+ * These are not taste. Each one is the range in which the shader still produces
+ * a Kwami: amplitude past 1 turns the sphere inside out through its own centre,
+ * a frequency under 0.2 stops reading as a surface at all, and particle counts
+ * in the thousands cost more frame budget than the mesh does. A creator can
+ * make something ugly inside these bounds — that is their business — but not
+ * something broken.
+ */
+export const TUNING_RANGES: Record<keyof KwamiTuning, { min: number; max: number; step: number }> = {
+  amplitude: { min: 0, max: 1, step: 0.01 },
+  frequency: { min: 0.2, max: 6, step: 0.1 },
+  reactivity: { min: 0, max: 2, step: 0.05 },
+  spin: { min: 0, max: 0.8, step: 0.01 },
+  rimPower: { min: 1, max: 8, step: 0.1 },
+  particles: { min: 0, max: 900, step: 10 },
+}
+
+const TUNING_KEYS = Object.keys(TUNING_RANGES) as Array<keyof KwamiTuning>
+
+/**
+ * Read whatever tuning a stored appearance carries.
+ *
+ * Per-key rather than all-or-nothing, unlike `paletteFor`. The palette is a
+ * *pairing* — one valid colour beside one default produces a combination nobody
+ * chose — but the tunables are independent, and a Kwami whose spin survived a
+ * bad amplitude is still the object its creator designed in every respect that
+ * parsed.
+ */
+export function readTuning(appearance: Record<string, unknown> | null | undefined): Partial<KwamiTuning> {
+  const raw = appearance?.tuning
+  if (!raw || typeof raw !== 'object') return {}
+  const source = raw as Record<string, unknown>
+
+  const out: Partial<KwamiTuning> = {}
+  for (const key of TUNING_KEYS) {
+    const value = source[key]
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue
+    const { min, max } = TUNING_RANGES[key]
+    out[key] = Math.max(min, Math.min(max, value))
+  }
+  return out
+}
+
+/**
+ * Normalise tuning for storage, dropping anything that is not a real override.
+ *
+ * Returns `undefined` rather than `{}` when nothing survives, so `toAppearance`
+ * can leave the key off the stored object entirely instead of writing an empty
+ * one that later reads as "tuned, to nothing".
+ */
+export function toTuning(tuning: Partial<KwamiTuning> | null | undefined): Partial<KwamiTuning> | undefined {
+  const cleaned = readTuning({ tuning: tuning ?? {} })
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined
 }

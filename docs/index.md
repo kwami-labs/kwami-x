@@ -39,6 +39,7 @@ Everything that decides who gets paid happens on chain. The conversation happens
 - **[Setup](/docs/setup)** — running it locally, with and without infrastructure
 - **[Protocol](/docs/protocol)** — the on-chain program, its accounts and its instructions
 - **[Economics](/docs/economics)** — ticket splits, payouts, the death rules
+- **[Energy](/docs/energy)** — what it costs a Kwami to speak, and what happens when it cannot
 - **[Architecture](/docs/architecture)** — how the pieces fit and what trusts what
 - **[Authentication](/docs/auth)** — six sign-in methods converging on one account
 - **[Embedding](/docs/embed)** — putting a Kwami on someone else's site

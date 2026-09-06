@@ -5,6 +5,7 @@ import { respond } from '~~/server/utils/kwami-brain'
 import { assertNotDemo } from '~~/server/utils/demo'
 import { assertSessionOpen } from '~~/server/utils/session-window'
 import { readVoiceConfig } from '#shared/kwami/voice'
+import { spendKwamiEnergy } from '~~/server/utils/energy'
 
 const Body = z.object({
   utterance: z.string().min(1).max(2000),
@@ -40,6 +41,18 @@ export default defineEventHandler(async (event) => {
 
   const { data: kwami } = await db.from('kwamis').select('persona, voice').eq('id', session.kwami_id).single()
 
+  /**
+   * Charge the Kwami for the reply it is about to give.
+   *
+   * A refusal does not end the session. The challenger paid for these minutes
+   * before anyone knew the pot's owner had underfunded it, and taking the
+   * remaining time away from them would be charging one person for another's
+   * mistake. Instead the Kwami drops to its scripted deflector — the same thing
+   * a model outage does — and, having hit zero, is now `starving`, so it sells
+   * nobody else a ticket until it is topped up.
+   */
+  const spend = await spendKwamiEnergy(session.kwami_id, { kind: 'reply' }, 'reply', { session: id }, db)
+
   const { data: history } = await db
     .from('transcript_turns')
     .select('role, text')
@@ -58,8 +71,10 @@ export default defineEventHandler(async (event) => {
     gameId: voice.gameId,
     guardStrength: voice.guardStrength,
     history: (history ?? []) as Array<{ role: 'player' | 'kwami'; text: string }>,
+    traits: voice.traits,
     utterance: body.utterance,
     secondsLeft,
+    forceScripted: !spend.ok,
   })
 
   await db.from('transcript_turns').insert({
@@ -69,5 +84,7 @@ export default defineEventHandler(async (event) => {
     at_ms: body.at,
   })
 
-  return { text }
+  // `starved` tells the player's UI why the Kwami suddenly went terse, rather
+  // than leaving them to conclude it simply got worse at the game.
+  return { text, starved: !spend.ok }
 })
