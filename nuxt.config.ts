@@ -63,6 +63,19 @@ export default defineNuxtConfig({
       platformTreasury: '',
       /** Flat SOL commission per mint. Decimal string; see commissionToLamports. */
       mintCommissionSol: '0.5',
+      /**
+       * How much energy one SOL buys.
+       *
+       * Public because the studio quotes the fuel a creator is about to buy
+       * before they approve the transaction, and a number the browser had to
+       * ask the server for would be a number the page could not show while the
+       * slider was moving.
+       *
+       * A deployment setting rather than a constant: the real cost of a reply
+       * is denominated in dollars and SOL is not, so an operator has to be able
+       * to move this without a release.
+       */
+      energyPerSol: '20000',
     },
   },
 
