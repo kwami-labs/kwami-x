@@ -10,6 +10,8 @@ import { encryptSecret } from '~~/server/utils/crypto'
 import { assertNotDemo } from '~~/server/utils/demo'
 import { requireUser, serviceClient } from '~~/server/utils/supabase'
 import { isValidAddress } from '~~/server/utils/solana'
+import { readTuning, toAppearance } from '#shared/kwami/appearance'
+import { readVoiceConfig } from '#shared/kwami/voice'
 
 const Body = z.object({
   name: z.string().min(2).max(48),
@@ -78,8 +80,30 @@ export default defineEventHandler(async (event) => {
       tagline: body.tagline,
       persona: body.persona,
       renderer: body.renderer,
-      appearance: body.appearance,
-      voice: body.voice,
+      /**
+       * Normalised, not passed through.
+       *
+       * Both columns are `jsonb` and both used to be written exactly as the
+       * client sent them, so a malformed `colorA` reached the database and only
+       * failed at render time — silently, as `paletteFor` fell back to the
+       * mint-hash palette. The creator then owned a permanent object that did
+       * not look like the one they designed, with nothing anywhere saying why.
+       *
+       * `toAppearance` and `readVoiceConfig` are the same functions the render
+       * path uses, so what is stored is exactly what will be read back.
+       *
+       * The raw colours go in rather than a resolved palette, because
+       * `toAppearance` returning `{}` for an unusable pair is the behaviour
+       * wanted here: an empty appearance lets `paletteFor` derive this Kwami's
+       * own colours from its mint at render time. Resolving the fallback now
+       * would instead freeze every malformed submission onto one identical
+       * hard-coded pair.
+       */
+      appearance: toAppearance(
+        { a: body.appearance.colorA as string, b: body.appearance.colorB as string },
+        readTuning(body.appearance),
+      ),
+      voice: readVoiceConfig(body.voice),
       hints: body.hints,
       state: 'draft',
       resolution_mode: body.resolutionMode,
