@@ -170,11 +170,11 @@ export function compileTraits(raw: unknown): string {
 
   const directives = TRAIT_AXES.map((axis) => {
     const value = vector[axis.id]
-    const raw = Math.abs(value)
+    const setting = Math.abs(value)
     // Rank by weighted magnitude so cruelty still leads; phrase by the raw
     // slider so "30" reads as moderately on every axis the creator touched.
-    const magnitude = raw * axis.weight
-    return { magnitude, text: `${intensityOf(raw)} ${value >= 0 ? axis.high : axis.low}` }
+    const magnitude = setting * axis.weight
+    return { magnitude, text: `${intensityOf(setting)} ${value >= 0 ? axis.high : axis.low}` }
   })
     .filter((d) => d.magnitude >= IGNORE_BELOW)
     .sort((a, b) => b.magnitude - a.magnitude)
