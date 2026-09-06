@@ -3,6 +3,7 @@ import { PublicKey } from '@solana/web3.js'
 import { costOf, energyFromLamports, type EnergyOp } from '#shared/energy/cost'
 import { FREE_TRIAL_MICRO, DEFAULT_ENERGY_PER_SOL } from '#shared/energy/constants'
 import { commissionToLamports } from '#shared/game/constants'
+import { fuelAfterCommission, resolveEnergyPerSol, treasuryDelta } from '#shared/energy/receipt'
 import { connection } from './solana'
 import { serviceClient } from './supabase'
 
@@ -28,8 +29,7 @@ export type EnergyReason = 'trial_grant' | 'mint_fuel' | 'topup' | 'reply' | 'vo
 
 /** How much energy one SOL buys in this deployment. */
 export function energyPerSol(): number {
-  const configured = Number(useRuntimeConfig().public.energyPerSol)
-  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_ENERGY_PER_SOL
+  return resolveEnergyPerSol(useRuntimeConfig().public.energyPerSol, DEFAULT_ENERGY_PER_SOL)
 }
 
 /**
@@ -218,12 +218,7 @@ export async function treasuryReceipt(signature: string): Promise<bigint> {
     accountKeysFromLookups: tx.meta?.loadedAddresses,
   })
   const index = keys.staticAccountKeys.findIndex((k) => k.equals(treasuryKey))
-  if (index === -1) return 0n
-
-  const before = BigInt(tx.meta?.preBalances?.[index] ?? 0)
-  const after = BigInt(tx.meta?.postBalances?.[index] ?? 0)
-  const delta = after - before
-  return delta > 0n ? delta : 0n
+  return treasuryDelta(tx.meta?.preBalances, tx.meta?.postBalances, index)
 }
 
 /**
@@ -240,7 +235,7 @@ export async function creditMintFuel(signature: string, kwamiId: string): Promis
   const config = useRuntimeConfig()
   const received = await treasuryReceipt(signature)
   const commission = commissionToLamports(config.public.mintCommissionSol as string)
-  const fuelLamports = received > commission ? received - commission : 0n
+  const fuelLamports = fuelAfterCommission(received, commission)
   if (fuelLamports === 0n) return kwamiEnergy(kwamiId)
 
   const micro = energyFromLamports(fuelLamports, energyPerSol())

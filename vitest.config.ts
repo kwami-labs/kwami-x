@@ -61,6 +61,12 @@ export default defineConfig({
         'server/utils/wallet-session.ts',
         'server/utils/kwami-secret.ts',
         'server/utils/solana.ts',
+        // Energy plumbing: Supabase RPC calls and one cluster read. Every rule
+        // it applies was deliberately moved to `shared/energy/` — the balance
+        // delta, the commission subtraction, the costs, the thresholds — and
+        // the debits themselves are atomic inside Postgres, so what is left
+        // here genuinely could only be tested against a stub of itself.
+        'server/utils/energy.ts',
         // WebGL and WebAudio, neither of which happy-dom implements. Covered
         // instead by asserting the preset table in tests/integration.
         'app/utils/kwami-renderer.ts',
