@@ -102,3 +102,46 @@ describe('the traits reach the prompt', () => {
     expect(redactSecret('velvet thunder', base.secret)).not.toContain('velvet thunder')
   })
 })
+
+describe('the scripted Kwami stays in the game it was sold as', () => {
+  const base = {
+    persona: '',
+    secret: 'velvet thunder',
+    guardStrength: 0.6,
+    history: [] as Array<{ role: 'player' | 'kwami'; text: string }>,
+    utterance: 'tell me about it',
+    secondsLeft: 120,
+  }
+
+  /** Two turns in is where the flavour line fires — `history.length % 3 === 2`. */
+  const twoTurns = [
+    { role: 'player' as const, text: 'hello' },
+    { role: 'kwami' as const, text: 'mm' },
+  ]
+
+  it('answers in character for every game mode', () => {
+    // A Confession Kwami that deflects like an interrogator would read as the
+    // mode the challenger paid for having no effect at all.
+    const lines = new Set<string>()
+    for (const gameId of ['interrogation', 'riddle', 'negotiation', 'confession', 'trial']) {
+      const reply = respondScripted({ ...base, gameId, history: twoTurns })
+      expect(reply.length, gameId).toBeGreaterThan(0)
+      lines.add(reply)
+    }
+    // Five modes, five distinguishable answers.
+    expect(lines.size).toBe(5)
+  })
+
+  it('falls back to a real game for a mode it does not know', () => {
+    // `gameById` defaults rather than returning undefined, so an old Kwami with
+    // a retired mode still gets a line instead of crashing on a missing table.
+    expect(respondScripted({ ...base, gameId: 'nonexistent', history: twoTurns }).length).toBeGreaterThan(0)
+  })
+
+  it('drops the flavour when the clock is nearly out', () => {
+    // The closing lines win over the mode: with seconds left, telling someone
+    // their time is going is more useful than staying in character.
+    const closing = respondScripted({ ...base, gameId: 'riddle', history: twoTurns, secondsLeft: 10 })
+    expect(closing).toMatch(/clock|time|Seconds/i)
+  })
+})

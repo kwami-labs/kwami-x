@@ -74,9 +74,14 @@ export default defineConfig({
         'app/utils/audio-meter.ts',
       ],
       /**
-       * A RATCHET, not a target. Measured 2026-09-05: 93.4 / 94.8 / 94.11 / 93.4, so the
-       * floor sits a couple of points under each — v8 drifts slightly run to run, and newly
-       * added source dilutes the ratio until its tests land.
+       * A RATCHET, not a target. Measured 2026-09-06: 95.2 / 91.5 / 96.4 / 96.1 (statements /
+       * branches / functions / lines), so the floor sits under each — v8 drifts slightly run to
+       * run, and newly added source dilutes the ratio until its tests land.
+       *
+       * Branches is the thin one and is worth knowing why: the remaining gap is almost entirely
+       * `kwami-brain.ts`'s Claude path, which cannot run without an API key, plus `attest.ts`
+       * and the `siwe` error branches. Raising the branch floor would pin the build to those
+       * rather than to anything a change is likely to break.
        *
        * Raise it after a clean `bun run test:coverage`. Never lower it to make a red build
        * pass; that is the one move that turns a ratchet back into a suggestion.
