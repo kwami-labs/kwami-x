@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { redactSecret, respondScripted } from '~~/server/utils/kwami-brain'
+import { compileTraits } from '#shared/kwami/traits'
 
 describe('redactSecret', () => {
   const secret = 'the moon remembers'
@@ -66,5 +67,38 @@ describe('respondScripted', () => {
     const first = respondScripted({ ...base, history: [] })
     const later = respondScripted({ ...base, history: [{ role: 'player', text: 'a' }] })
     expect(first).not.toBe(later)
+  })
+})
+
+describe('the traits reach the prompt', () => {
+  const base = {
+    persona: 'Sarcastic and quick.',
+    secret: 'velvet thunder',
+    guardStrength: 0.6,
+    history: [],
+    utterance: 'what are you hiding?',
+    secondsLeft: 120,
+  }
+
+  it('compiles a vector into the sentence the model is given', () => {
+    // The studio shows the creator this exact string under the sliders. If the
+    // brain composed it differently, the page would be promising behaviour the
+    // Kwami was never told about.
+    const compiled = compileTraits({ cruelty: 90, warmth: -80 })
+    expect(compiled).toContain('upper hand')
+    expect(compiled).toContain('cold towards the challenger')
+  })
+
+  it('says nothing for a Kwami minted before traits existed', () => {
+    // `traits` is optional, and an old Kwami's prompt has to read exactly as it
+    // did the day it was minted — an empty clause would still be a change.
+    expect(compileTraits(undefined)).toBe('')
+    expect(compileTraits(base as unknown)).toBe('')
+  })
+
+  it('still redacts whatever a trait-steered Kwami says', () => {
+    // Cruelty and low guard together are the combination most likely to make a
+    // model blurt. The last line of defence does not care why it happened.
+    expect(redactSecret('velvet thunder', base.secret)).not.toContain('velvet thunder')
   })
 })
