@@ -172,6 +172,17 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
   }
 
+  /** Email a one-time reset link; the user lands back on `/auth/callback`. */
+  async function resetPassword(email: string) {
+    loading.value = true
+    error.value = null
+    const { error: e } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    })
+    if (e) fail(e.message)
+    loading.value = false
+  }
+
   /** Phone sign-in is two steps: request a code, then verify it. */
   async function signInWithPhone(phone: string) {
     loading.value = true
@@ -320,6 +331,7 @@ export const useAuthStore = defineStore('auth', () => {
     init,
     signInWithEmail,
     signUpWithEmail,
+    resetPassword,
     signInWithPhone,
     verifyPhone,
     signInWithOAuth,

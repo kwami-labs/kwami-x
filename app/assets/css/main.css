@@ -214,6 +214,26 @@ button {
 .hint { font-size: 0.8rem; color: var(--fg-dim); }
 .error-text { font-size: 0.82rem; color: var(--danger); }
 
+.linkish {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 560;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.linkish:hover {
+  text-decoration-color: var(--fg-muted);
+}
+a.linkish {
+  color: var(--fg);
+}
+
 .input,
 .textarea,
 .select {
