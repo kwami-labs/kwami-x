@@ -4,6 +4,7 @@ import { assertNotDemo } from '~~/server/utils/demo'
 import { requireUser, serviceClient } from '~~/server/utils/supabase'
 import { connection, isValidAddress } from '~~/server/utils/solana'
 import { findVaultPda } from '#shared/solana/pda'
+import { creditMintFuel } from '~~/server/utils/energy'
 
 const Body = z.object({
   draftId: z.string().uuid(),
@@ -71,5 +72,27 @@ export default defineEventHandler(async (event) => {
 
   if (updateError) throw createError({ statusCode: 500, statusMessage: updateError.message })
 
-  return { mint: body.mint, vault: vault.toBase58(), state: 'minted' }
+  /**
+   * Credit whatever fuel the creator bought inside the bundle.
+   *
+   * The same transaction that has just been verified also carries the energy
+   * purchase, so there is nothing further to trust: the treasury's balance
+   * delta, minus the advertised commission, is what the creator paid for
+   * energy. Done after the state update rather than before, so a Kwami is never
+   * left fuelled but unbound if this half fails.
+   *
+   * Failing here must not fail the mint. The NFT exists, the vault exists and
+   * the row is bound — the whole irreversible part succeeded. An owner missing
+   * their opening fuel has a support problem; an owner told their mint failed
+   * after paying for it has a much worse one, and would very likely try again.
+   */
+  let energy = '0'
+  try {
+    energy = (await creditMintFuel(body.signature, draft.id)).toString()
+  } catch {
+    // Deliberately swallowed. The ledger is keyed on the signature, so a later
+    // retry of this same credit is still safe and still idempotent.
+  }
+
+  return { mint: body.mint, vault: vault.toBase58(), state: 'minted', energy }
 })

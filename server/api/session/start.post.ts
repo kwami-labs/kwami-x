@@ -44,7 +44,25 @@ export default defineEventHandler(async (event) => {
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
   if (!kwami) throw createError({ statusCode: 404, statusMessage: 'No such Kwami.' })
   if (kwami.state !== 'live') {
-    throw createError({ statusCode: 409, statusMessage: 'This Kwami is not accepting challengers.' })
+    /**
+     * The backstop, and only the backstop.
+     *
+     * The ticket has already been paid on chain by the time this route sees
+     * it, so refusing here means the challenger is out of pocket. What
+     * actually protects them is earlier: a starving Kwami is not `live`, so it
+     * is absent from the arena and the leaderboard, and the play page will not
+     * offer a ticket for it. This catches the narrow race where a Kwami ran out
+     * between the page loading and the transaction confirming.
+     *
+     * Naming the reason matters for exactly that case — "not accepting
+     * challengers" reads as the owner having paused it deliberately, which is a
+     * very different thing from having run out of fuel a second ago.
+     */
+    const reason =
+      kwami.state === 'starving'
+        ? 'This Kwami has run out of energy and cannot answer. Its owner has to top it up.'
+        : 'This Kwami is not accepting challengers.'
+    throw createError({ statusCode: 409, statusMessage: reason })
   }
 
   const tx = await connection().getTransaction(body.signature, {
