@@ -327,6 +327,31 @@ export interface KwamiRendererHandle {
 /** How fast a parameter change catches up, per second. ~400ms to settle. */
 const TWEEN_RATE = 6
 
+/**
+ * The parameters a body and a set of overrides add up to.
+ *
+ * Pulled out of the render loop so it can be tested without a WebGL context —
+ * this is the whole of the logic behind "switching body changes the Kwami", and
+ * leaving it inside a closure that only runs against a real GPU meant the one
+ * thing worth asserting was the one thing unreachable from a test.
+ *
+ * A derivation rather than a stored snapshot: changing body keeps the
+ * creator's overrides, and clearing an override falls back to whatever the
+ * preset says *today* rather than to a copy of what it said at mount.
+ */
+export function resolveRendererParams(
+  renderer: KwamiRenderer,
+  tuning: Partial<RendererParams> = {},
+): RendererParams {
+  const preset = RENDERER_PRESETS[renderer] ?? RENDERER_PRESETS['blob-xyz']
+  const resolved = { ...preset }
+  for (const [key, value] of Object.entries(tuning)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue
+    resolved[key as keyof RendererParams] = value
+  }
+  return resolved
+}
+
 /** The parameters that can be eased rather than swapped. */
 type LiveParams = Pick<RendererParams, 'amplitude' | 'frequency' | 'reactivity' | 'spin' | 'rimPower'>
 
@@ -344,19 +369,7 @@ export function mountKwami(
   let body: KwamiRenderer = options.renderer ?? 'blob-xyz'
   let tuning: Partial<RendererParams> = { ...options.tuning }
 
-  /**
-   * The parameters being aimed at: the body's preset with the creator's
-   * overrides laid on top.
-   *
-   * Kept as a derivation rather than a stored snapshot so that changing the
-   * body keeps the overrides, and clearing an override falls back to whatever
-   * the preset says today rather than to a copy of what it said at mount.
-   */
-  function resolve(): RendererParams {
-    return { ...RENDERER_PRESETS[body], ...tuning }
-  }
-
-  let target = resolve()
+  let target = resolveRendererParams(body, tuning)
   const live: LiveParams = {
     amplitude: target.amplitude,
     frequency: target.frequency,
@@ -464,7 +477,7 @@ export function mountKwami(
   /** Re-derive the target and apply anything that cannot be eased into place. */
   function retarget() {
     const previous = target
-    target = resolve()
+    target = resolveRendererParams(body, tuning)
     applyDetail(target.detail)
     if (target.particles !== previous.particles) applyParticles(target.particles)
   }
