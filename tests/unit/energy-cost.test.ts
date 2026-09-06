@@ -120,3 +120,21 @@ describe('display conversion', () => {
     expect(fromEnergy(Number.NaN)).toBe(0n)
   })
 })
+
+describe('rounding guards', () => {
+  it('charges nothing for a zero-length op rather than a whole unit', () => {
+    // `ceilDiv` rounds away from zero, so guarding the non-positive case is
+    // what stops "no speech happened" costing one micro-energy every turn.
+    expect(costOf({ kind: 'voice', seconds: 0 })).toBe(0n)
+  })
+
+  it('is exact at amounts a double would round', () => {
+    // A whale top-up: lamports * energyPerSol * 1000 is far past 2^53, and a
+    // float would credit a rounded figure that the ledger could never
+    // reconcile against the chain.
+    const huge = 10n ** 12n
+    expect(energyFromLamports(huge, DEFAULT_ENERGY_PER_SOL)).toBe(
+      (huge * BigInt(DEFAULT_ENERGY_PER_SOL) * MICRO_PER_ENERGY) / LAMPORTS_PER_SOL,
+    )
+  })
+})

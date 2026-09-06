@@ -131,3 +131,14 @@ describe('randomPalette', () => {
     expect(KWAMI_PALETTES).toContain(randomPalette(() => 0.5))
   })
 })
+
+describe('paletteOfLook fallback', () => {
+  it('still returns a usable palette when a look names one that is gone', () => {
+    // A palette can be renamed or retired; a look pointing at the old id must
+    // not hand the renderer `undefined` and turn the Kwami white — which is
+    // exactly the failure `hslToHex`'s comment records from the other
+    // direction.
+    const orphan = { ...KWAMI_LOOKS[0]!, paletteId: 'retired-palette' }
+    expect(paletteOfLook(orphan)).toBe(KWAMI_PALETTES[0])
+  })
+})
