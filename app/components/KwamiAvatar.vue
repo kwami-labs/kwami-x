@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { mountKwami, type KwamiRendererHandle } from '~/utils/kwami-renderer'
+import type {
+  RendererParams,
+  mountKwami,
+  type KwamiActivity,
+  type KwamiRendererHandle,
+} from '~/utils/kwami-renderer'
 import type { KwamiRenderer } from '#shared/types/kwami'
 
 const props = withDefaults(
@@ -13,8 +18,21 @@ const props = withDefaults(
     level?: number
     /** 0 = idle, 1 = agitated. */
     arousal?: number
+    /** What it is doing — drives the movement it generates on its own. */
+    activity?: KwamiActivity
+    /** Creator overrides on top of the body's preset. */
+    tuning?: Partial<RendererParams> | null
   }>(),
-  { renderer: 'blob-xyz', colorA: '#7c5cff', colorB: '#3ddc97', vitality: 1, level: 0, arousal: 0 },
+  {
+    renderer: 'blob-xyz',
+    colorA: '#7c5cff',
+    colorB: '#3ddc97',
+    vitality: 1,
+    level: 0,
+    arousal: 0,
+    activity: 'idle',
+    tuning: null,
+  },
 )
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
@@ -27,6 +45,7 @@ onMounted(() => {
     colorA: props.colorA,
     colorB: props.colorB,
     vitality: props.vitality,
+    tuning: props.tuning ?? undefined,
   })
 })
 
@@ -46,6 +65,33 @@ watch(
   (v) => handle?.setVitality(v),
 )
 watch([() => props.colorA, () => props.colorB], ([a, b]) => handle?.setColors(a, b))
+watch(
+  () => props.activity,
+  (v) => handle?.setActivity(v),
+)
+
+/**
+ * Move to another body in place, rather than remounting.
+ *
+ * The obvious alternative — `:key="renderer"` on this component — tears down a
+ * WebGL context and builds a new one on every click. Browsers cap live contexts
+ * at around sixteen and drop the oldest without warning, which is the whole
+ * reason `kwami-field.ts` packs a dozen Kwamis into one context; doing the
+ * opposite from a click handler on the mint page is the same hazard pointed the
+ * other way.
+ */
+watch(
+  () => props.renderer,
+  (v) => handle?.setRenderer(v),
+)
+
+// Deep, because the studio's sliders mutate fields on one object rather than
+// replacing it — a shallow watch would fire on the first drag and never again.
+watch(
+  () => props.tuning,
+  (v) => handle?.setTuning(v ?? {}),
+  { deep: true },
+)
 
 // The renderer sizes itself from its parent, so a layout change that does not
 // resize the window still needs a nudge.

@@ -292,7 +292,21 @@ export interface KwamiRendererOptions {
   colorB?: string
   /** 0 = dead, 1 = at its high-water mark. */
   vitality?: number
+  /** Creator overrides on top of the body's preset. */
+  tuning?: Partial<RendererParams>
 }
+
+/**
+ * What the Kwami is doing.
+ *
+ * The renderer drives these itself rather than taking a raw arousal number for
+ * each, because the interesting one is `thinking`: a reply takes a second or
+ * two to arrive, and a Kwami that holds perfectly still through it reads as
+ * having crashed. `docs/builder.md` makes the same point about the streaming
+ * builder — a spinner cannot be told apart from a hang — and the fix is the
+ * same, which is to keep something moving that is visibly *waiting*.
+ */
+export type KwamiActivity = 'idle' | 'listening' | 'thinking' | 'speaking'
 
 export interface KwamiRendererHandle {
   /** Live audio level in [0, 1]; smoothed internally. */
@@ -301,9 +315,20 @@ export interface KwamiRendererHandle {
   setArousal(value: number): void
   setVitality(value: number): void
   setColors(a: string, b: string): void
+  /** Move to another body. Tweens the continuous parameters; swaps the rest. */
+  setRenderer(renderer: KwamiRenderer): void
+  /** Apply creator overrides on top of the current body's preset. */
+  setTuning(tuning: Partial<RendererParams>): void
+  setActivity(activity: KwamiActivity): void
   resize(): void
   dispose(): void
 }
+
+/** How fast a parameter change catches up, per second. ~400ms to settle. */
+const TWEEN_RATE = 6
+
+/** The parameters that can be eased rather than swapped. */
+type LiveParams = Pick<RendererParams, 'amplitude' | 'frequency' | 'reactivity' | 'spin' | 'rimPower'>
 
 /**
  * Mount a Kwami into a canvas.
@@ -316,7 +341,29 @@ export function mountKwami(
   canvas: HTMLCanvasElement,
   options: KwamiRendererOptions = {},
 ): KwamiRendererHandle {
-  const preset = RENDERER_PRESETS[options.renderer ?? 'blob-xyz']
+  let body: KwamiRenderer = options.renderer ?? 'blob-xyz'
+  let tuning: Partial<RendererParams> = { ...options.tuning }
+
+  /**
+   * The parameters being aimed at: the body's preset with the creator's
+   * overrides laid on top.
+   *
+   * Kept as a derivation rather than a stored snapshot so that changing the
+   * body keeps the overrides, and clearing an override falls back to whatever
+   * the preset says today rather than to a copy of what it said at mount.
+   */
+  function resolve(): RendererParams {
+    return { ...RENDERER_PRESETS[body], ...tuning }
+  }
+
+  let target = resolve()
+  const live: LiveParams = {
+    amplitude: target.amplitude,
+    frequency: target.frequency,
+    reactivity: target.reactivity,
+    spin: target.spin,
+    rimPower: target.rimPower,
+  }
 
   const renderer = new WebGLRenderer({
     canvas,
@@ -336,12 +383,12 @@ export function mountKwami(
   // them directly instead of indexing `material.uniforms` sixty times a second.
   const uniforms = {
     uTime: { value: 0 },
-    uAmplitude: { value: preset.amplitude },
-    uFrequency: { value: preset.frequency },
+    uAmplitude: { value: live.amplitude },
+    uFrequency: { value: live.frequency },
     uAudio: { value: 0 },
     uArousal: { value: 0 },
     uVitality: { value: options.vitality ?? 1 },
-    uRimPower: { value: preset.rimPower },
+    uRimPower: { value: live.rimPower },
     uColorA: { value: new Color(options.colorA ?? '#7c5cff') },
     uColorB: { value: new Color(options.colorB ?? '#3ddc97') },
   }
@@ -352,13 +399,33 @@ export function mountKwami(
     uniforms,
   })
 
-  const mesh = new Mesh(new IcosahedronGeometry(1, preset.detail), material)
+  const mesh = new Mesh(new IcosahedronGeometry(1, target.detail), material)
   scene.add(mesh)
+  let detail = target.detail
 
   let sparks: Points | null = null
-  if (preset.particles > 0) {
-    const positions = new Float32Array(preset.particles * 3)
-    for (let i = 0; i < preset.particles; i++) {
+  let sparkColor = options.colorB ?? '#3ddc97'
+
+  /**
+   * Rebuild the orbiting cloud.
+   *
+   * Discrete rather than tweened: the count is a buffer length, and there is no
+   * halfway between 120 particles and 260. Disposing and rebuilding is cheap
+   * because it is a single position attribute, and it only happens when the
+   * creator actually changes body or particle density.
+   */
+  function applyParticles(count: number) {
+    if (sparks) {
+      scene.remove(sparks)
+      sparks.geometry.dispose()
+      ;(sparks.material as PointsMaterial).dispose()
+      sparks = null
+    }
+    const total = Math.max(0, Math.round(count))
+    if (total === 0) return
+
+    const positions = new Float32Array(total * 3)
+    for (let i = 0; i < total; i++) {
       // Rejection-free spherical shell sampling: uniform on the sphere, then
       // jittered outwards so the cloud has depth instead of reading as a ring.
       const theta = Math.random() * Math.PI * 2
@@ -374,7 +441,7 @@ export function mountKwami(
       geo,
       new PointsMaterial({
         size: 0.02,
-        color: new Color(options.colorB ?? '#3ddc97'),
+        color: new Color(sparkColor),
         transparent: true,
         opacity: 0.7,
         blending: AdditiveBlending,
@@ -384,13 +451,53 @@ export function mountKwami(
     scene.add(sparks)
   }
 
+  applyParticles(target.particles)
+
+  /** Swap the mesh's subdivision. Only when it actually changed — it is a realloc. */
+  function applyDetail(next: number) {
+    if (next === detail) return
+    detail = next
+    mesh.geometry.dispose()
+    mesh.geometry = new IcosahedronGeometry(1, next)
+  }
+
+  /** Re-derive the target and apply anything that cannot be eased into place. */
+  function retarget() {
+    const previous = target
+    target = resolve()
+    applyDetail(target.detail)
+    if (target.particles !== previous.particles) applyParticles(target.particles)
+  }
+
   let audioTarget = 0
   let audioSmoothed = 0
   let arousal = 0
+  let activity: KwamiActivity = 'idle'
   let raf = 0
   let disposed = false
   const clockStart = performance.now()
   let lastFrame = clockStart
+
+  /**
+   * The movement the Kwami generates on its own, on top of what the game asks for.
+   *
+   * `thinking` is the one that matters and the one that is deliberately a
+   * *pulse*: a constant lift would just be a slightly bigger Kwami, which is
+   * indistinguishable from a frozen one. It has to visibly move to read as
+   * working rather than hung.
+   */
+  function activityArousal(elapsed: number): number {
+    switch (activity) {
+      case 'listening':
+        return 0.18
+      case 'thinking':
+        return 0.36 + Math.sin(elapsed / 260) * 0.22
+      case 'speaking':
+        return 0.24
+      default:
+        return 0
+    }
+  }
 
   function resize() {
     const parent = canvas.parentElement
@@ -406,19 +513,34 @@ export function mountKwami(
     if (disposed) return
     const dt = Math.min((now - lastFrame) / 1000, 0.1)
     lastFrame = now
+    const elapsed = now - clockStart
 
     // Attack fast, release slow: speech onsets should snap, but the surface
     // should not flicker in the gaps between syllables.
     const rate = audioTarget > audioSmoothed ? 18 : 4
     audioSmoothed += (audioTarget - audioSmoothed) * Math.min(1, dt * rate)
 
-    uniforms.uTime.value = (now - clockStart) / 1000
-    uniforms.uAudio.value = audioSmoothed
-    uniforms.uArousal.value = arousal
+    // Ease towards the current body rather than snapping to it. Switching body
+    // is a design decision the creator is making with their eyes, and watching
+    // the Kwami *become* the thing they picked is most of what tells them the
+    // click worked.
+    const ease = Math.min(1, dt * TWEEN_RATE)
+    live.amplitude += (target.amplitude - live.amplitude) * ease
+    live.frequency += (target.frequency - live.frequency) * ease
+    live.reactivity += (target.reactivity - live.reactivity) * ease
+    live.spin += (target.spin - live.spin) * ease
+    live.rimPower += (target.rimPower - live.rimPower) * ease
 
-    mesh.rotation.y += dt * preset.spin
-    mesh.rotation.x = Math.sin((now - clockStart) / 6000) * 0.14
-    if (sparks) sparks.rotation.y -= dt * preset.spin * 0.4
+    uniforms.uTime.value = elapsed / 1000
+    uniforms.uAudio.value = audioSmoothed
+    uniforms.uArousal.value = Math.min(1, arousal + activityArousal(elapsed))
+    uniforms.uAmplitude.value = live.amplitude
+    uniforms.uFrequency.value = live.frequency
+    uniforms.uRimPower.value = live.rimPower
+
+    mesh.rotation.y += dt * live.spin
+    mesh.rotation.x = Math.sin(elapsed / 6000) * 0.14
+    if (sparks) sparks.rotation.y -= dt * live.spin * 0.4
 
     renderer.render(scene, camera)
     raf = requestAnimationFrame(frame)
@@ -432,7 +554,7 @@ export function mountKwami(
 
   return {
     setAudioLevel(level) {
-      audioTarget = Math.max(0, Math.min(1, level)) * preset.reactivity
+      audioTarget = Math.max(0, Math.min(1, level)) * live.reactivity
     },
     setArousal(value) {
       arousal = Math.max(0, Math.min(1, value))
@@ -443,6 +565,23 @@ export function mountKwami(
     setColors(a, b) {
       uniforms.uColorA.value.set(a)
       uniforms.uColorB.value.set(b)
+      // The cloud is a separate material and does not read the uniforms, so it
+      // used to keep whatever colour it was built with — a creator changing the
+      // rim colour saw four of the five bodies keep their old sparks.
+      sparkColor = b
+      if (sparks) (sparks.material as PointsMaterial).color.set(b)
+    },
+    setRenderer(next) {
+      if (next === body) return
+      body = next
+      retarget()
+    },
+    setTuning(next) {
+      tuning = { ...next }
+      retarget()
+    },
+    setActivity(next) {
+      activity = next
     },
     resize,
     dispose() {
