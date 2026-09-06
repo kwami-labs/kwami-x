@@ -34,13 +34,13 @@ Same shape, EIP-4361 message and a `0x`-prefixed 65-byte signature.
 
 ### `GET /api/kwami`
 
-| Query    | Default | Values                                 |
-| -------- | ------- | -------------------------------------- |
-| `state`  | `live`  | `live` `paused` `cracked` `dead` `all` |
-| `sort`   | `pot`   | `pot` `new` `contested`                |
-| `limit`  | 24      | 1–60                                   |
-| `offset` | 0       |                                        |
-| `owner`  | —       | filter by owner wallet                 |
+| Query    | Default | Values                                            |
+| -------- | ------- | ------------------------------------------------- |
+| `state`  | `live`  | `live` `paused` `starving` `cracked` `dead` `all` |
+| `sort`   | `pot`   | `pot` `new` `contested`                           |
+| `limit`  | 24      | 1–60                                              |
+| `offset` | 0       |                                                   |
+| `owner`  | —       | filter by owner wallet                            |
 
 ```json
 ← { "demo": false, "kwamis": [...], "totals": { "pot": 0, "live": 0, "sessions": 0 } }
@@ -140,6 +140,66 @@ Returns an HMAC-signed MoonPay widget URL. Signing happens server-side because t
 ### `POST /api/builder/generate` — auth, author only
 
 Generates an Anchor extension from a brief. Requires the Kwami to be in `minted` state.
+
+## Energy
+
+### `GET /api/kwami/:mint/energy` — auth, author only
+
+Balance, derived state and the last twenty ledger rows. Author-only including the ledger: how
+heavily a Kwami is being talked to is competitive information.
+
+```json
+← { "balance": "38000", "state": "full", "kwamiState": "live",
+    "energyPerSol": 20000, "ledger": [...] }
+```
+
+Balances are strings. They are `bigint` everywhere else and JSON has no such thing; a number would
+round past 2^53, and this is the one figure on the page that has to be exact.
+
+### `POST /api/kwami/:mint/energy/topup` — auth
+
+Credits energy against an already-confirmed payment.
+
+```json
+→ { "signature": "<base58>" }
+← { "balance": "58000", "state": "full", "kwamiState": "live" }
+```
+
+The signature is fetched from the cluster and the **treasury's own balance delta** is what gets
+credited — a client asserting "I paid" is worth nothing when the reward for lying is free inference.
+Idempotent on the signature, so a retry after a lost response cannot double it.
+
+Not author-gated. Anyone may fuel anyone's Kwami; there is no way to abuse paying for someone else's
+running costs.
+
+## Studio
+
+### `GET /api/studio/energy`
+
+The account's pre-mint trial allowance, granted on first read. Answers for a signed-out or demo
+caller too, with the full allowance — the meter is on screen before anything is spent, and a dash
+there reads as broken rather than as "not yet".
+
+### `POST /api/studio/preview`
+
+Talk to a Kwami that has not been minted. Takes the unsaved draft, spends the Kwami's own energy
+once it exists and the account's trial before that, and returns the reply.
+
+```json
+→ { "persona", "gameId", "guardStrength", "traits", "secret", "history", "utterance", "mint?" }
+← { "text": "…", "source": "trial", "cost": "1000", "balance": "39000" }
+```
+
+It calls the same `respond()` the live game calls — including the redaction pass — rather than a
+preview-only imitation. A test drive that exercised different code from the real thing would be
+worse than none: it would build confidence in behaviour that was never going to happen.
+
+Returns **402** when the balance cannot cover a reply. That is an outcome, not a failure: the
+creator has not done anything wrong, they have used the thing up, and the page offers them fuel.
+
+This is the one mutating-ish route that does **not** refuse in demo mode. Mutating routes return 503
+there because they would have to pretend to have written something; this one writes nothing, and the
+scripted brain needs no API key. A fresh clone should be able to hear a Kwami talk.
 
 ## Docs
 
