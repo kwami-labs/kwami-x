@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type {
-  RendererParams,
+import {
   mountKwami,
   type KwamiActivity,
   type KwamiRendererHandle,
+  type RendererParams,
 } from '~/utils/kwami-renderer'
 import type { KwamiRenderer } from '#shared/types/kwami'
 
