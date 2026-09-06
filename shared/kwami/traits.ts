@@ -132,11 +132,11 @@ const IGNORE_BELOW = 10
  */
 const MAX_DIRECTIVES = 5
 
-/** Bucket a weighted magnitude into the adverb that precedes the directive. */
+/** Bucket a slider magnitude into the adverb that precedes the directive. */
 function intensityOf(magnitude: number): string {
   if (magnitude >= 85) return 'very strongly'
   if (magnitude >= 60) return 'strongly'
-  if (magnitude >= 35) return 'moderately'
+  if (magnitude >= 25) return 'moderately'
   return 'slightly'
 }
 
@@ -170,8 +170,11 @@ export function compileTraits(raw: unknown): string {
 
   const directives = TRAIT_AXES.map((axis) => {
     const value = vector[axis.id]
-    const magnitude = Math.abs(value) * axis.weight
-    return { magnitude, text: `${intensityOf(magnitude)} ${value >= 0 ? axis.high : axis.low}` }
+    const raw = Math.abs(value)
+    // Rank by weighted magnitude so cruelty still leads; phrase by the raw
+    // slider so "30" reads as moderately on every axis the creator touched.
+    const magnitude = raw * axis.weight
+    return { magnitude, text: `${intensityOf(raw)} ${value >= 0 ? axis.high : axis.low}` }
   })
     .filter((d) => d.magnitude >= IGNORE_BELOW)
     .sort((a, b) => b.magnitude - a.magnitude)
