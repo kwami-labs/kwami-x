@@ -103,6 +103,25 @@ function clearFeedback() {
   auth.error = null
 }
 
+/**
+ * Switch between signing in and signing up.
+ *
+ * A function rather than a multi-statement inline handler. Vue's expression
+ * parser needs statements separated by semicolons, and Prettier strips those
+ * out of an attribute every time it formats — so the inline form made
+ * `bun run format` and `bun run build` mutually exclusive, and whichever ran
+ * last decided whether the app compiled.
+ *
+ * Clearing the confirmation field matters on the way back to sign-in: leaving a
+ * half-typed password behind in a hidden input is a surprise the next submit
+ * would deliver.
+ */
+function setEmailMode(mode: 'signin' | 'signup') {
+  emailMode.value = mode
+  clearFeedback()
+  passwordConfirm.value = ''
+}
+
 function go(next: View) {
   clearFeedback()
   view.value = next
@@ -433,11 +452,7 @@ onKeyStroke('Escape', () => {
             :class="{ 'tab--on': emailMode === 'signin' }"
             :aria-selected="emailMode === 'signin'"
             :disabled="pending"
-            @click="
-              emailMode = 'signin'
-              clearFeedback()
-              passwordConfirm = ''
-            "
+            @click="setEmailMode('signin')"
           >
             Sign in
           </button>
@@ -448,10 +463,7 @@ onKeyStroke('Escape', () => {
             :class="{ 'tab--on': emailMode === 'signup' }"
             :aria-selected="emailMode === 'signup'"
             :disabled="pending"
-            @click="
-              emailMode = 'signup'
-              clearFeedback()
-            "
+            @click="setEmailMode('signup')"
           >
             Create account
           </button>
