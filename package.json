@@ -36,8 +36,8 @@
     "rules:apply": "node scripts/ci/apply-branch-rules.mjs"
   },
   "dependencies": {
-    "@noble/curves": "^1.9.0",
-    "@noble/hashes": "^1.8.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@nuxtjs/color-mode": "^4.0.1",
     "@pinia/nuxt": "^1.0.2",
     "@solana/spl-token": "^0.4.14",
