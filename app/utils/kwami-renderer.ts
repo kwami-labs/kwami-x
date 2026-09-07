@@ -502,6 +502,31 @@ export function createKwamiGeometry(resolution: number): SphereGeometry {
   return new SphereGeometry(1, width, height)
 }
 
+/** Unit sphere, plus the largest displacement any preset reaches, plus the rim. */
+export const KWAMI_FRAME_RADIUS = 1.6
+
+/**
+ * How far back the camera has to sit for the whole Kwami to be in frame.
+ *
+ * `PerspectiveCamera.fov` is the *vertical* field of view, so a fixed distance
+ * only frames correctly at the one aspect ratio it was chosen for. Every
+ * portrait container — the mint stage, a phone, an embed in a sidebar — kept
+ * its vertical framing while the horizontal field narrowed with the width, and
+ * the Kwami was cropped off both sides. What was left was a magnified patch of
+ * one hemisphere: no silhouette, no rim, and one colour out of a palette of
+ * three, which reads as a bad render rather than as a cropped one.
+ *
+ * Pure, and exported, because it is the whole of "the Kwami fits" and leaving
+ * it inside a closure that only runs against a real GPU put the one thing worth
+ * asserting out of a test's reach.
+ */
+export function cameraDistanceFor(fovDegrees: number, aspect: number, radius = KWAMI_FRAME_RADIUS): number {
+  const half = Math.tan((fovDegrees * Math.PI) / 360)
+  // Whichever axis is tighter wins: fitting the height alone is what cropped
+  // the width on every portrait canvas.
+  return Math.max(radius / half, radius / (half * aspect))
+}
+
 export interface KwamiRendererOptions {
   renderer?: KwamiRenderer
   skin?: KwamiSkin
@@ -636,7 +661,7 @@ export function mountKwami(
 
   const scene = new Scene()
   const camera = new PerspectiveCamera(45, 1, 0.1, 100)
-  camera.position.set(0, 0, 4.2)
+  camera.position.set(0, 0, cameraDistanceFor(camera.fov, 1))
 
   // Uniform objects are captured by reference below, so the render loop mutates
   // them directly instead of indexing `material.uniforms` sixty times a second.
@@ -786,21 +811,6 @@ export function mountKwami(
     }
   }
 
-  /**
-   * Pull the camera back far enough that the whole Kwami is in frame.
-   *
-   * `camera.fov` is the *vertical* field of view, so a fixed camera distance
-   * only frames the Kwami correctly at the one aspect ratio it was chosen for.
-   * Anything portrait — the mint stage, a phone, an embed in a sidebar — kept
-   * the same vertical framing while the horizontal field narrowed with the
-   * width, and the Kwami was cropped off both sides. What was left on screen
-   * was a magnified patch of one hemisphere: no silhouette, no rim, and a
-   * single colour out of a palette of three, which reads as a low-quality
-   * render rather than as a cropped one.
-   *
-   * Fitting to whichever axis is tighter costs two tangents on a resize and
-   * makes the framing a property of the Kwami rather than of the container.
-   */
   function resize() {
     const parent = canvas.parentElement
     if (!parent) return
@@ -808,11 +818,7 @@ export function mountKwami(
     if (w === 0 || h === 0) return
     renderer.setSize(w, h, false)
     camera.aspect = w / h
-    // Unit sphere plus the largest displacement any preset reaches, plus the
-    // rim light, which is part of the silhouette and is not worth clipping.
-    const radius = 1.6
-    const half = Math.tan((camera.fov * Math.PI) / 360)
-    camera.position.z = Math.max(radius / half, radius / (half * camera.aspect))
+    camera.position.z = cameraDistanceFor(camera.fov, camera.aspect)
     camera.updateProjectionMatrix()
   }
 
