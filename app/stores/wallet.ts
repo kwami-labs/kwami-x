@@ -73,6 +73,9 @@ export const useWalletStore = defineStore('wallet', () => {
   function reset() {
     status.value = 'disconnected'
     address.value = null
+    // A stale failure from a previous attempt has nothing to say about the
+    // state the wallet is in now, and the banner has no other way to leave.
+    error.value = null
     lamports.value = 0n
     usdcBaseUnits.value = 0n
     balancesLoadedAt.value = null
@@ -98,7 +101,11 @@ export const useWalletStore = defineStore('wallet', () => {
       status.value = 'connected'
       await refreshBalances()
     } catch {
-      status.value = 'disconnected'
+      // This runs on mount and can land *after* a user has pressed Connect and
+      // been approved — `onlyIfTrusted` is rejected for a site with no prior
+      // grant, which is exactly the visit where someone connects by hand.
+      // Reporting "disconnected" over the top of that would drop a live wallet.
+      if (status.value !== 'connected') status.value = 'disconnected'
     }
   }
 
@@ -111,6 +118,10 @@ export const useWalletStore = defineStore('wallet', () => {
       // On a phone the extension can never exist; the universal link reopens
       // this page inside Phantom's browser, where it does.
       if (isMobileBrowser()) {
+        // Navigating away is not guaranteed — the link can be blocked, and the
+        // user can come back with the page still alive. Leaving the button
+        // disabled on "Connecting…" forever is the worse of the two outcomes.
+        status.value = 'disconnected'
         window.location.href = phantomDeeplink()
         return
       }
@@ -128,7 +139,7 @@ export const useWalletStore = defineStore('wallet', () => {
       await refreshBalances()
     } catch (e) {
       status.value = 'disconnected'
-      error.value = isUserRejection(e) ? null : describeWalletError(e)
+      error.value = isUserRejection(e) ? null : describeWalletError(e, 'connect')
     }
   }
 

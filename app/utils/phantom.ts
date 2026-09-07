@@ -192,17 +192,40 @@ export function isUserRejection(error: unknown): boolean {
   return message.includes('user rejected') || message.includes('user denied')
 }
 
+/**
+ * What the user was trying to do when the wallet refused.
+ *
+ * Phantom's error codes are per-provider, not per-method: the same `-32603`
+ * comes back from `connect`, `signMessage` and `signAndSendTransaction` alike.
+ * Without knowing which was asked for, the only honest description is a vague
+ * one — and the description this used to give was worse than vague, because it
+ * named a transaction. Someone pressing "Connect wallet" on a browser where
+ * Phantom is installed but has never been set up was told their transaction had
+ * failed simulation, which is untrue, unactionable, and sends them looking for
+ * a problem with their money.
+ */
+export type WalletAction = 'connect' | 'send'
+
 /** Turn a Phantom error into something worth putting in front of a person. */
-export function describeWalletError(error: unknown): string {
-  if (isUserRejection(error)) return 'You dismissed the wallet prompt.'
+export function describeWalletError(error: unknown, action: WalletAction = 'send'): string {
+  if (isUserRejection(error)) {
+    return action === 'connect' ? 'You dismissed the connection request.' : 'You dismissed the wallet prompt.'
+  }
   const code = (error as { code?: number })?.code
   switch (code) {
     case 4900:
       return 'Phantom is locked. Open it and unlock, then try again.'
     case 4100:
-      return 'Phantom has not authorised this site yet. Connect first.'
+      return action === 'connect'
+        ? 'Phantom would not authorise this site. Open Phantom, check it is unlocked and on the right account, then try again.'
+        : 'Phantom has not authorised this site yet. Connect first.'
     case -32603:
-      return 'Phantom could not process the transaction. It may have failed simulation.'
+      // JSON-RPC "internal error". On a transaction it usually is simulation;
+      // on a connect it is almost always an extension with no wallet in it yet,
+      // which is a state a person can actually get themselves out of.
+      return action === 'send'
+        ? 'Phantom could not process the transaction. It may have failed simulation.'
+        : 'Phantom could not complete the request. If you have just installed it, finish setting up a wallet there, then reload this page.'
     default:
       return (error as { message?: string })?.message ?? 'Something went wrong talking to Phantom.'
   }

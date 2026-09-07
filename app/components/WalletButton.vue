@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PHANTOM_INSTALL_URL } from '~/utils/phantom'
+import { PHANTOM_INSTALL_URL, isPhantomInstalled } from '~/utils/phantom'
 
 const wallet = useWalletStore()
 const auth = useAuthStore()
@@ -14,7 +14,12 @@ onClickOutside(menu, () => (open.value = false))
 const bound = computed(() => Boolean(wallet.address && auth.boundAddresses.includes(wallet.address)))
 
 async function onConnect() {
-  if (wallet.status === 'unavailable') {
+  // `unavailable` is a three-second verdict reached on mount, and Phantom does
+  // not always inject inside three seconds — `waitForPhantom` exists because of
+  // it. Trusting that verdict alone sent people who have Phantom installed to
+  // the download page. Re-check synchronously, because the popup has to open on
+  // this click's gesture and an `await` first would lose it.
+  if (wallet.status === 'unavailable' && !isPhantomInstalled()) {
     window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener')
     return
   }
@@ -98,7 +103,11 @@ async function onSignOut() {
       </div>
     </div>
 
-    <p v-if="wallet.error" class="error-text wallet__error">{{ wallet.error }}</p>
+    <!-- Click to dismiss: it floats over the page, and nothing else clears it
+         until the next connection attempt. -->
+    <p v-if="wallet.error" class="error-text wallet__error" @click="wallet.error = null">
+      {{ wallet.error }}
+    </p>
   </div>
 </template>
 
@@ -158,5 +167,13 @@ async function onSignOut() {
   top: calc(100% + 8px);
   width: max-content;
   max-width: 260px;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  /* It sits on top of the page, so it needs its own ground to be readable. */
+  background: var(--bg-raised);
+  border: 1px solid rgba(255, 92, 114, 0.32);
+  box-shadow: var(--shadow-lift);
+  cursor: pointer;
+  z-index: 60;
 }
 </style>

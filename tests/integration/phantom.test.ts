@@ -128,6 +128,30 @@ describe('error interpretation', () => {
     expect(describeWalletError({ code: -32603 })).toMatch(/simulation|process/i)
   })
 
+  it('never blames a transaction for a failure to connect', () => {
+    // Phantom returns -32603 from every method, so the description used to tell
+    // someone pressing "Connect wallet" on a browser where Phantom is installed
+    // but never set up that their transaction had failed simulation: untrue,
+    // unactionable, and it sends them looking for a problem with their money.
+    const connecting = describeWalletError({ code: -32603 }, 'connect')
+    expect(connecting).not.toMatch(/transaction|simulation/i)
+    // And it has to say what to actually do about it.
+    expect(connecting).toMatch(/set(ting)? up|reload/i)
+  })
+
+  it('names the connection, not a generic prompt, when one is dismissed', () => {
+    expect(describeWalletError({ code: 4001 }, 'connect')).toMatch(/connection/i)
+  })
+
+  it('leaves the transaction paths alone, which is what the default is for', () => {
+    // Four call sites send transactions and pass no action; changing what they
+    // say was never the point of making this operation-aware.
+    for (const code of [4001, 4900, 4100, -32603]) {
+      expect(describeWalletError({ code }), String(code)).toBe(describeWalletError({ code }, 'send'))
+    }
+    expect(describeWalletError({ code: -32603 }, 'send')).toMatch(/simulation/i)
+  })
+
   it('falls back to the underlying message', () => {
     expect(describeWalletError(new Error('blockhash not found'))).toBe('blockhash not found')
     expect(describeWalletError({})).toMatch(/something went wrong/i)
