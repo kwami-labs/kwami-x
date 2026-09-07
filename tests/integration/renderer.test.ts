@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  KWAMI_FRAME_RADIUS,
   KWAMI_VERTEX_SHADER,
   RENDERER_PRESETS,
   buildKwamiFragmentShader,
+  cameraDistanceFor,
   resolveRendererParams,
   segmentsForResolution,
 } from '~/utils/kwami-renderer'
@@ -203,6 +205,87 @@ describe('skins', () => {
       expect(tuning.opacity, skin.id).toBe(skin.opacity)
     }
     expect(tuningForSkin('chrome').shininess).toBeGreaterThan(tuningForSkin('matte').shininess)
+  })
+})
+
+describe('cameraDistanceFor', () => {
+  /** Half the extent the Kwami projects to, in NDC, on each axis. 1.0 is the edge. */
+  function projected(aspect: number) {
+    const fov = 45
+    const z = cameraDistanceFor(fov, aspect)
+    const halfHeight = Math.tan((fov * Math.PI) / 360) * z
+    return { y: KWAMI_FRAME_RADIUS / halfHeight, x: KWAMI_FRAME_RADIUS / (halfHeight * aspect) }
+  }
+
+  it('keeps the whole Kwami on screen at any shape of container', () => {
+    // The bug: a fixed camera distance frames to the *vertical* field of view,
+    // so the mint stage (tall and narrow), a phone and a sidebar embed all
+    // cropped the Kwami off both sides and showed a magnified patch of one
+    // hemisphere — no silhouette, one colour out of three.
+    // The tighter axis lands exactly on the edge, so the bound carries a float
+    // epsilon rather than pretending two tangents round-trip exactly.
+    for (const aspect of [0.4, 0.53, 0.75, 1, 1.6, 2.4]) {
+      const { x, y } = projected(aspect)
+      expect(x, `aspect ${aspect}`).toBeLessThanOrEqual(1 + 1e-9)
+      expect(y, `aspect ${aspect}`).toBeLessThanOrEqual(1 + 1e-9)
+    }
+  })
+
+  it('fills the frame rather than fitting a circle inside a margin', () => {
+    // Fitting is only half of it: a camera that always fell back to the widest
+    // case would frame every Kwami as a speck. The tighter axis has to touch.
+    for (const aspect of [0.4, 1, 2.4]) {
+      const { x, y } = projected(aspect)
+      expect(Math.max(x, y), `aspect ${aspect}`).toBeCloseTo(1, 5)
+    }
+  })
+
+  it('pulls back for a portrait container and not for a landscape one', () => {
+    expect(cameraDistanceFor(45, 0.5)).toBeGreaterThan(cameraDistanceFor(45, 1))
+    expect(cameraDistanceFor(45, 2)).toBe(cameraDistanceFor(45, 1))
+  })
+})
+
+describe('skin surfaces', () => {
+  const MATERIALS = ['matte', 'glossy', 'metallic', 'subsurface', 'chrome', 'clay', 'jade'] as const
+
+  it('shades off the light rather than off a matcap that is not there', () => {
+    // What made half the catalogue look identical: these skins read `nrm.xy` as
+    // a lookup into a matcap texture that does not exist. It only ever worked
+    // by accident on a smooth sphere — on a displaced blob the normal's z sits
+    // near 1 across most of the visible surface, so the lookup collapsed to a
+    // constant and chrome, jade, clay and toon all rendered as the same flat
+    // wash of the creator's first colour.
+    for (const skin of [...MATERIALS, 'toon-matcap' as const]) {
+      expect(buildKwamiFragmentShader(skin), skin).not.toContain('nrm.xy * 0.5 + 0.5')
+    }
+  })
+
+  it('reads the displacement the vertex shader went to the trouble of sending', () => {
+    // `vDisplace` is the only thing the fragment shader cannot work out for
+    // itself, and darkening the creases with it is most of what stops a
+    // displaced sphere reading as a ball with a gradient painted on it.
+    for (const skin of MATERIALS) {
+      expect(buildKwamiFragmentShader(skin), skin).toContain('cavity()')
+    }
+  })
+
+  it('gives the reflective skins an environment to reflect', () => {
+    for (const skin of ['chrome', 'metallic', 'glossy'] as const) {
+      expect(buildKwamiFragmentShader(skin), skin).toContain('envSample(')
+    }
+  })
+
+  it('closes every skin body, so one stray backtick cannot swallow the next', () => {
+    // These are GLSL inside template literals. A backtick in a comment ends the
+    // string, and the failure lands as a parse error in a file nobody was
+    // editing — or worse, as a shader that silently compiles to nothing.
+    for (const skin of KWAMI_SKINS) {
+      const source = buildKwamiFragmentShader(skin.id)
+      expect(source, skin.id).not.toContain('`')
+      // A body that lost its tail would still contain the wrapper.
+      expect(source.trim().endsWith('}'), skin.id).toBe(true)
+    }
   })
 })
 
