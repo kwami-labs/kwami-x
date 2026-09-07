@@ -5,13 +5,18 @@ import {
   type KwamiRendererHandle,
   type RendererParams,
 } from '~/utils/kwami-renderer'
-import type { KwamiRenderer } from '#shared/types/kwami'
+import type { KwamiRenderer, KwamiSkin } from '#shared/types/kwami'
+import { DEFAULT_SKIN } from '#shared/kwami/skins'
 
 const props = withDefaults(
   defineProps<{
     renderer?: KwamiRenderer
+    /** Surface material. Orthogonal to the body. */
+    skin?: KwamiSkin
     colorA?: string
     colorB?: string
+    /** Third colour. Derived from the other two when a Kwami predates skins. */
+    colorC?: string
     /** 0 = dead, 1 = at its high-water mark. */
     vitality?: number
     /** Live audio level in [0, 1]. */
@@ -22,16 +27,27 @@ const props = withDefaults(
     activity?: KwamiActivity
     /** Creator overrides on top of the body's preset. */
     tuning?: Partial<RendererParams> | null
+    /**
+     * How much mesh this render is worth.
+     *
+     * `stage` is the Kwami as its creator built it. `card` caps the mesh, for a
+     * thumbnail in a grid where a dozen live WebGL contexts share one page and
+     * nobody can see the difference anyway.
+     */
+    size?: 'stage' | 'card'
   }>(),
   {
     renderer: 'blob-xyz',
+    skin: DEFAULT_SKIN,
     colorA: '#7c5cff',
     colorB: '#3ddc97',
+    colorC: '#ff5cb8',
     vitality: 1,
     level: 0,
     arousal: 0,
     activity: 'idle',
     tuning: null,
+    size: 'stage',
   },
 )
 
@@ -42,10 +58,13 @@ onMounted(() => {
   if (!canvas.value) return
   handle = mountKwami(canvas.value, {
     renderer: props.renderer,
+    skin: props.skin,
     colorA: props.colorA,
     colorB: props.colorB,
+    colorC: props.colorC,
     vitality: props.vitality,
     tuning: props.tuning ?? undefined,
+    ...(props.size === 'card' ? { resolutionCap: 120 } : {}),
   })
 })
 
@@ -64,7 +83,7 @@ watch(
   () => props.vitality,
   (v) => handle?.setVitality(v),
 )
-watch([() => props.colorA, () => props.colorB], ([a, b]) => handle?.setColors(a, b))
+watch([() => props.colorA, () => props.colorB, () => props.colorC], ([a, b, c]) => handle?.setColors(a, b, c))
 watch(
   () => props.activity,
   (v) => handle?.setActivity(v),
@@ -83,6 +102,13 @@ watch(
 watch(
   () => props.renderer,
   (v) => handle?.setRenderer(v),
+)
+
+// Same reasoning as the body: a skin change recompiles one program in place
+// rather than tearing down the WebGL context the way a `:key` would.
+watch(
+  () => props.skin,
+  (v) => handle?.setSkin(v),
 )
 
 // Deep, because the studio's sliders mutate fields on one object rather than

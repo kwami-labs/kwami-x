@@ -101,7 +101,7 @@ export interface KwamiOffChain {
   tagline: string
   /** Personality prompt fragment fed to the voice agent. */
   persona: string
-  /** Renderer id from the `kwami` 3D library. */
+  /** Renderer id from the `kwami` 3D library — the body, not the surface. */
   renderer: KwamiRenderer
   /** Renderer tuning (colours, geometry, motion). */
   appearance: Record<string, unknown>
@@ -114,6 +114,15 @@ export interface KwamiOffChain {
 }
 
 export type KwamiRenderer = 'blob-xyz' | 'crystal-ball' | 'orbital-shards' | 'stars-genesis' | 'black-hole'
+
+/**
+ * The surface a Kwami's body wears.
+ *
+ * Re-exported rather than redeclared: the list is twenty-two long and the mint
+ * endpoint, the shader assembler and the studio gallery all read it, which is
+ * three places for a second copy to fall out of step with the first.
+ */
+export type { KwamiSkin } from '../kwami/skins'
 
 /**
  * Voice configuration, as it is actually stored.

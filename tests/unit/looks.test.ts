@@ -3,9 +3,37 @@ import { KWAMI_LOOKS, lookById, paletteOfLook } from '#shared/kwami/looks'
 import { KWAMI_PALETTES, TUNING_RANGES, toTuning } from '#shared/kwami/appearance'
 import { jitterTraits, randomKwami, randomPalette } from '#shared/kwami/random'
 import { KWAMI_PERSONAS } from '#shared/kwami/personas'
+import { KWAMI_SKINS, SKIN_FAMILIES, isSkin, skinDefinition } from '#shared/kwami/skins'
 import { TRAIT_AXES } from '#shared/kwami/traits'
 
 const RENDERERS = ['blob-xyz', 'crystal-ball', 'orbital-shards', 'stars-genesis', 'black-hole']
+
+describe('KWAMI_SKINS', () => {
+  it('has unique ids and a note on every one', () => {
+    const ids = KWAMI_SKINS.map((s) => s.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const skin of KWAMI_SKINS) {
+      // The note is the only thing under the gallery that says what the
+      // difference between `flat` and `stepped` actually is.
+      expect(skin.note.length, skin.id).toBeGreaterThan(10)
+      expect(skin.shininess, skin.id).toBeGreaterThanOrEqual(0)
+      expect(skin.opacity, skin.id).toBeGreaterThan(0)
+      expect(skin.opacity, skin.id).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('files every skin under a family the filter offers', () => {
+    // A skin in a family with no button is a skin reachable only by clearing
+    // the filter, which nothing on the page suggests doing.
+    const offered = new Set(SKIN_FAMILIES.map((f) => f.id))
+    for (const skin of KWAMI_SKINS) expect(offered, skin.id).toContain(skin.family)
+  })
+
+  it('falls back to a real definition for an id this build does not know', () => {
+    expect(skinDefinition('obsidian').id).toBe('radial')
+    expect(skinDefinition(null).id).toBe('radial')
+  })
+})
 
 describe('KWAMI_LOOKS', () => {
   it('has unique ids', () => {
@@ -13,17 +41,26 @@ describe('KWAMI_LOOKS', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('names a real body and a real palette', () => {
+  it('names a real body, a real skin and a real palette', () => {
     // A look pointing at a palette id that does not exist would silently fall
     // back to Amethyst, so every look with a typo would quietly become the
     // same look.
     for (const look of KWAMI_LOOKS) {
       expect(RENDERERS, look.id).toContain(look.renderer)
+      expect(isSkin(look.skin), `${look.id}.${look.skin}`).toBe(true)
       expect(
         KWAMI_PALETTES.map((p) => p.id),
         look.id,
       ).toContain(look.paletteId)
     }
+  })
+
+  it('reaches across the skin catalogue rather than clustering on one family', () => {
+    // The looks row is the only thing on the page that will ever suggest
+    // `chrome` on a black hole. A table that only ever named colour skins would
+    // leave two thirds of the catalogue undiscoverable in practice.
+    const families = new Set(KWAMI_LOOKS.map((l) => skinDefinition(l.skin).family))
+    expect(families.size).toBe(SKIN_FAMILIES.length)
   })
 
   it('only tunes within the ranges the shader renders in', () => {

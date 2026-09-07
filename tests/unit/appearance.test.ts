@@ -9,6 +9,7 @@ import {
   toAppearance,
   TUNING_RANGES,
   readTuning,
+  thirdColor,
   toTuning,
 } from '#shared/kwami/appearance'
 
@@ -104,9 +105,34 @@ describe('paletteFor', () => {
   it('prefers the palette the creator chose', () => {
     const palette = paletteFor({
       mint: 'Kw1Ora111111111111111111111111111111111111111',
-      appearance: { colorA: '#ff0000', colorB: '#00ff00' },
+      appearance: { colorA: '#ff0000', colorB: '#00ff00', colorC: '#0000ff' },
     })
-    expect(palette).toEqual({ a: '#ff0000', b: '#00ff00' })
+    expect(palette).toEqual({ a: '#ff0000', b: '#00ff00', c: '#0000ff' })
+  })
+
+  it('derives a third colour for a Kwami minted before skins existed', () => {
+    // The tricolour skins are half the catalogue, and a stored pair is what
+    // every Kwami minted before them has. Falling back to grey there would put
+    // a dead band through the middle of `radial` on all of them.
+    const stored = { colorA: '#ff0000', colorB: '#00ff00' }
+    const palette = paletteFor({ mint: 'Kw1Ora1', appearance: stored })
+    expect(palette.a).toBe('#ff0000')
+    expect(palette.b).toBe('#00ff00')
+    expect(isHexColor(palette.c)).toBe(true)
+    expect(palette.c).toBe(thirdColor('#ff0000', '#00ff00'))
+    // Deterministic, so the same old Kwami renders identically everywhere.
+    expect(paletteFor({ mint: 'Kw1Ora1', appearance: stored }).c).toBe(palette.c)
+  })
+
+  it('ignores a malformed third rather than dropping the pair with it', () => {
+    // The palette is a pairing and falls back whole; the third is a repair for
+    // a Kwami that never had one, so a bad value repairs the same way.
+    const palette = paletteFor({
+      mint: 'Kw1Ora1',
+      appearance: { colorA: '#ff0000', colorB: '#00ff00', colorC: 'chartreuse' },
+    })
+    expect(palette.a).toBe('#ff0000')
+    expect(palette.c).toBe(thirdColor('#ff0000', '#00ff00'))
   })
 
   it('falls back to the mint hash when no appearance was stored', () => {

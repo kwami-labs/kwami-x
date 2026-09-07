@@ -18,6 +18,7 @@ import { KWAMI_LOOKS, paletteOfLook, type KwamiLook } from './looks'
 import { KWAMI_PERSONAS, type KwamiPersona } from './personas'
 import { KWAMI_GAMES, KWAMI_VOICES } from './voice'
 import { TRAIT_AXES, type TraitVector } from './traits'
+import type { KwamiSkin } from './skins'
 import type { KwamiRenderer } from '../types/kwami'
 
 /** A source of numbers in [0, 1). `Math.random` satisfies it. */
@@ -47,8 +48,10 @@ export function jitterTraits(traits: TraitVector, rng: Rng, spread = 18): TraitV
 export interface RandomKwami {
   look: KwamiLook
   renderer: KwamiRenderer
+  skin: KwamiSkin
   colorA: string
   colorB: string
+  colorC: string
   paletteId: string
   persona: KwamiPersona
   traits: TraitVector
@@ -73,8 +76,10 @@ export function randomKwami(rng: Rng): RandomKwami {
   return {
     look,
     renderer: look.renderer,
+    skin: look.skin,
     colorA: palette.a,
     colorB: palette.b,
+    colorC: palette.c,
     paletteId: palette.id,
     persona,
     traits: jitterTraits(persona.traits, rng),

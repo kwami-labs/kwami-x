@@ -100,8 +100,13 @@ export default defineEventHandler(async (event) => {
        * hard-coded pair.
        */
       appearance: toAppearance(
-        { a: body.appearance.colorA as string, b: body.appearance.colorB as string },
+        {
+          a: body.appearance.colorA as string,
+          b: body.appearance.colorB as string,
+          c: body.appearance.colorC as string,
+        },
         readTuning(body.appearance),
+        body.appearance.skin as string,
       ),
       voice: readVoiceConfig(body.voice),
       hints: body.hints,

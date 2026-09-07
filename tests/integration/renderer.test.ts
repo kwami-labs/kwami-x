@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { RENDERER_PRESETS, resolveRendererParams } from '~/utils/kwami-renderer'
+import {
+  KWAMI_VERTEX_SHADER,
+  RENDERER_PRESETS,
+  buildKwamiFragmentShader,
+  resolveRendererParams,
+  segmentsForResolution,
+} from '~/utils/kwami-renderer'
+import { KWAMI_SKINS, tuningForSkin } from '#shared/kwami/skins'
+import { lookFor } from '~/utils/format'
 import { TUNING_RANGES, readTuning, toAppearance } from '#shared/kwami/appearance'
 import { KWAMI_LOOKS } from '#shared/kwami/looks'
 import type { KwamiRenderer } from '#shared/types/kwami'
@@ -20,13 +28,30 @@ describe('renderer presets', () => {
     for (const [name, preset] of Object.entries(RENDERER_PRESETS)) {
       expect(preset.amplitude, name).toBeGreaterThan(0)
       expect(preset.amplitude, name).toBeLessThan(1)
-      expect(preset.detail, name).toBeGreaterThanOrEqual(3)
-      // An icosphere at detail 6 is ~40k vertices — past the point where a
-      // mid-range phone holds 60fps with several cards on screen.
-      expect(preset.detail, name).toBeLessThanOrEqual(5)
       expect(preset.particles, name).toBeGreaterThanOrEqual(0)
       expect(preset.rimPower, name).toBeGreaterThan(0)
+      expect(preset.opacity, name).toBeGreaterThan(0)
+      // The mesh has to be fine enough that the silhouette is a curve and
+      // coarse enough that a mid-range phone holds 60fps with several cards on
+      // screen. The resolution slider is the only thing that can reach it.
+      expect(segmentsForResolution(preset.resolution).width, name).toBeGreaterThanOrEqual(96)
+      expect(segmentsForResolution(preset.resolution).width, name).toBeLessThanOrEqual(256)
     }
+  })
+
+  it('opens on a blob that is nearly a sphere', () => {
+    // The bug this exists for: the old defaults put the whole displacement
+    // budget into the resting shape, so every Kwami was a lumpy potato before
+    // a word was said and the audio term had nothing left to express. A blob
+    // at rest should read as a smooth, swelling ball.
+    const blob = RENDERER_PRESETS['blob-xyz']
+    expect(blob.amplitude).toBeLessThan(0.3)
+    // Under one full cycle of noise across the sphere, so the surface reads as
+    // one swelling shape rather than as boiling.
+    expect(blob.frequency).toBeLessThan(1.2)
+    // And it is never completely still, which is what separates alive from
+    // crashed.
+    expect(blob.breathing).toBeGreaterThan(0)
   })
 
   it('gives each renderer a distinguishable silhouette', () => {
@@ -127,6 +152,118 @@ describe('resolveRendererParams', () => {
       for (const [key, value] of Object.entries(look.tuning)) {
         expect(params[key as keyof typeof params], `${look.id}.${key}`).toBe(value)
       }
+    }
+  })
+})
+
+describe('skins', () => {
+  it('compiles a distinct program for every skin in the catalogue', () => {
+    // A missing body would silently fall back to the default surface, so a
+    // creator picking `chrome` would get `radial` with no error anywhere.
+    const programs = new Set<string>()
+    for (const skin of KWAMI_SKINS) {
+      const source = buildKwamiFragmentShader(skin.id)
+      expect(source, skin.id).toContain('vec3 kwamiSurface()')
+      programs.add(source)
+    }
+    expect(programs.size).toBe(KWAMI_SKINS.length)
+  })
+
+  it('declares every varying the vertex shader hands over', () => {
+    // The two shaders are written apart and linked at runtime, where a
+    // mismatch is a console warning inside a WebGL context nobody is watching.
+    const source = buildKwamiFragmentShader('marble')
+    for (const declaration of [
+      'varying vec3 vNormal',
+      'varying vec3 vViewDir',
+      'varying vec3 vPos',
+      'varying float vDisplace',
+    ]) {
+      expect(source, declaration).toContain(declaration)
+      expect(KWAMI_VERTEX_SHADER, declaration).toContain(declaration)
+    }
+  })
+
+  it('encodes its output rather than writing linear light to an sRGB buffer', () => {
+    // The whole reason every Kwami used to look muddy and a stop dark. Three
+    // converts a hex uniform into linear light and does not convert back for a
+    // ShaderMaterial, so the shader has to.
+    const source = buildKwamiFragmentShader('radial')
+    expect(source).toContain('encodeSRGB')
+    expect(source).toContain('aces(')
+    expect(source).toMatch(/gl_FragColor\s*=\s*vec4\(encodeSRGB\(aces\(color\)\)/)
+  })
+
+  it('lands each skin on its own material defaults', () => {
+    // Picking `chrome` at `matte`'s shininess is a grey ball, which reads as
+    // the skin being broken rather than as a slider being wrong.
+    for (const skin of KWAMI_SKINS) {
+      const tuning = tuningForSkin(skin.id)
+      expect(tuning.shininess, skin.id).toBe(skin.shininess)
+      expect(tuning.opacity, skin.id).toBe(skin.opacity)
+    }
+    expect(tuningForSkin('chrome').shininess).toBeGreaterThan(tuningForSkin('matte').shininess)
+  })
+})
+
+describe('lookFor', () => {
+  it('reads back everything the studio wrote, not only the colours', () => {
+    // The bug this exists for: the card, the profile, the play stage and the
+    // embed each resolved the palette and dropped the skin and the tuning. A
+    // creator could spend ten minutes choosing a chrome surface with a slow
+    // spin, mint it, and land on a profile page showing the default blob — the
+    // appearance was stored correctly and read back nowhere but the studio.
+    const stored = toAppearance(
+      { a: '#7c5cff', b: '#3ddc97', c: '#ff5cb8' },
+      { spin: 0.05, shininess: 180 },
+      'chrome',
+    )
+    const look = lookFor({ mint: 'Kw1Ora1', appearance: stored })
+    expect(look.skin).toBe('chrome')
+    expect(look.tuning).toEqual({ spin: 0.05, shininess: 180 })
+    expect(look.palette).toEqual({ a: '#7c5cff', b: '#3ddc97', c: '#ff5cb8' })
+  })
+
+  it('degrades each part on its own', () => {
+    // An unknown skin is a surface this build cannot compile, and the right
+    // answer is the default surface with the creator's real colours — not a
+    // fallback palette as well.
+    const look = lookFor({
+      mint: 'Kw1Ora1',
+      appearance: { colorA: '#ff0000', colorB: '#00ff00', skin: 'obsidian' },
+    })
+    expect(look.skin).toBe('radial')
+    expect(look.palette.a).toBe('#ff0000')
+  })
+
+  it('gives a Kwami with no stored appearance a complete look anyway', () => {
+    const look = lookFor({ mint: 'Kw3Shr111111111111111111111111111111111111111' })
+    expect(look.skin).toBe('radial')
+    expect(look.tuning).toEqual({})
+    expect(Object.values(look.palette).every((c) => /^#[0-9a-f]{6}$/.test(c))).toBe(true)
+  })
+})
+
+describe('segmentsForResolution', () => {
+  it('rises with the slider and never leaves the affordable range', () => {
+    const widths = [120, 140, 170, 200, 220].map((r) => segmentsForResolution(r).width)
+    expect(widths).toEqual([...widths].sort((a, b) => a - b))
+    expect(Math.min(...widths)).toBeGreaterThanOrEqual(48)
+    expect(Math.max(...widths)).toBeLessThanOrEqual(256)
+  })
+
+  it('gives a mesh fine enough that the silhouette is a curve', () => {
+    // The bug this exists for: three's PolyhedronGeometry `detail` splits each
+    // face into (detail + 1)² triangles rather than subdividing recursively, so
+    // the icosphere this replaced was 720 triangles where the code believed it
+    // was 20,000. Every Kwami had visibly straight edges around its outline.
+    const { width, height } = segmentsForResolution(RENDERER_PRESETS['blob-xyz'].resolution)
+    expect(width * height * 2).toBeGreaterThan(10_000)
+  })
+
+  it('always produces an even ring, so the seam closes on a vertex', () => {
+    for (const resolution of [120, 137, 180, 199, 220]) {
+      expect(segmentsForResolution(resolution).width % 2, String(resolution)).toBe(0)
     }
   })
 })
