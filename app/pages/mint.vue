@@ -297,18 +297,29 @@ const canMint = computed(
 /**
  * How far down the build we are, in [0, 1].
  *
- * One number, published to CSS as `--p`, that every parallax layer reads. The
- * alternative — a transform per layer written from JavaScript — puts five style
- * writes on the scroll path for an effect the compositor can do on its own, and
- * `useElementBounding` already recalculates on scroll, so nothing here adds a
- * second listener.
+ * One number, published to CSS as `--p`, which every parallax layer reads. A
+ * transform per layer written from JavaScript would put five style writes on
+ * the scroll path for an effect the compositor can do on its own; this puts
+ * one custom property on the container and lets CSS multiply it out.
+ *
+ * `useWindowScroll` rather than `useElementBounding`, which also reports a
+ * scroll-relative `top` and looked like it would do the job in one call: its
+ * recalculation never fired here, so `--p` sat at whatever it had been at the
+ * first measurement and the parallax was a still image. The scroll position is
+ * what this actually depends on, and asking for it directly is both shorter and
+ * the thing that works.
  */
-const bounds = useElementBounding(panel)
+const { y: scrollY } = useWindowScroll()
 const { height: viewportH } = useWindowSize()
+/** Read off the document rather than the panel: the header and footer scroll too. */
+const documentH = ref(0)
+useResizeObserver(panel, () => {
+  documentH.value = document.documentElement.scrollHeight
+})
 const scrolled = computed(() => {
-  const travel = bounds.height.value - viewportH.value
+  const travel = documentH.value - viewportH.value
   if (travel < 40) return 0
-  return Math.min(1, Math.max(0, -bounds.top.value / travel))
+  return Math.min(1, Math.max(0, scrollY.value / travel))
 })
 
 /**
@@ -1196,7 +1207,10 @@ async function onSubmit() {
 
 .rail {
   position: sticky;
-  top: calc(var(--header-h) + 8px);
+  /* Flush under the site header. An eight-pixel gap here is a letterbox that
+     section headings slide through on their way past, which reads as the rail
+     failing to cover them rather than as breathing room. */
+  top: var(--header-h);
   z-index: 20;
   display: flex;
   flex-direction: column;
