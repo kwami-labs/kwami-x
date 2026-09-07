@@ -49,7 +49,7 @@ const accounts = computed(() => {
   ].filter((a): a is { label: string; address: string; note: string } => Boolean(a.address))
 })
 
-const palette = computed(() => paletteFor(kwami.value ?? { mint: mint.value }))
+const look = computed(() => lookFor(kwami.value ?? { mint: mint.value }))
 const isOwner = computed(() => wallet.address && kwami.value?.owner_wallet === wallet.address)
 
 const embedSnippet = computed(
@@ -81,8 +81,11 @@ useSeoMeta({
     <section class="detail__stage card">
       <KwamiAvatar
         :renderer="kwami.renderer as never"
-        :color-a="palette.a"
-        :color-b="palette.b"
+        :skin="look.skin"
+        :color-a="look.palette.a"
+        :color-b="look.palette.b"
+        :color-c="look.palette.c"
+        :tuning="look.tuning"
         :vitality="kwami.vitality"
       />
       <span class="badge detail__state" :class="`badge--${kwami.state}`">

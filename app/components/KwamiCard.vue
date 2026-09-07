@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { paletteFor } from '~/utils/format'
+import { lookFor } from '~/utils/format'
 
 interface KwamiSummary {
   mint: string
@@ -21,7 +21,7 @@ interface KwamiSummary {
 
 const props = defineProps<{ kwami: KwamiSummary }>()
 
-const palette = computed(() => paletteFor(props.kwami))
+const look = computed(() => lookFor(props.kwami))
 
 const ticket = computed(() => {
   const { ticket_price_lamports: sol, ticket_price_usdc: usdc } = props.kwami
@@ -54,8 +54,12 @@ const stateLabel = computed(() => {
     <div class="kcard__stage">
       <KwamiAvatar
         :renderer="kwami.renderer as never"
-        :color-a="palette.a"
-        :color-b="palette.b"
+        size="card"
+        :skin="look.skin"
+        :color-a="look.palette.a"
+        :color-b="look.palette.b"
+        :color-c="look.palette.c"
+        :tuning="look.tuning"
         :vitality="kwami.vitality"
       />
       <span class="badge kcard__state" :class="`badge--${kwami.state}`">

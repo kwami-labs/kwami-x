@@ -55,7 +55,9 @@ A short exclusion list in `vitest.config.ts` drops type-only declarations (they 
 
 Where a module was hard to test for a structural reason, the structure changed rather than the list growing. `attest.ts` separates building the oracle message from looking up the key, so the byte layout is testable without a keypair. `server/utils/energy.ts` is on the list, but only after every rule it applies moved into `shared/energy/` first — the balance delta a transaction delivered, the commission subtraction, the costs and the thresholds — and the debits themselves are atomic inside Postgres. What is left really could only be tested against a stub of itself.
 
-Likewise `kwami-renderer.ts` stays excluded because happy-dom has no WebGL, but the parameter resolution behind it does not need a GPU and no longer hides inside the render loop: `resolveRendererParams` is exported and tested directly, which is what actually pins "switching body changes the Kwami".
+Likewise `kwami-renderer.ts` stays excluded because happy-dom has no WebGL, but the parts of it that decide what a Kwami looks like do not need a GPU and no longer hide inside the render loop. `resolveRendererParams` is exported and tested directly, which is what pins "switching body changes the Kwami". `buildKwamiFragmentShader` returns the assembled GLSL as a string, so the suite can assert that all twenty-two skins compile to distinct programs, that the varyings on both sides of the link match, and that the output is encoded rather than written to the framebuffer as raw linear light — three failures that a browser reports as a Kwami which is simply not drawn, with nothing in the console. And `segmentsForResolution` is a pure function over the creator's slider, which is where the mesh being two orders of magnitude coarser than intended would have been caught.
+
+The state transitions behind the appearance studio live in `shared/kwami/form.ts` for the same reason: what a click on a swatch or a skin actually changes is the interesting part, and it is a pure function returning a patch rather than something that only happens inside a mounted component.
 
 ## The on-chain program
 
