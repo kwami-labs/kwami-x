@@ -74,9 +74,11 @@ Two transports, chosen at runtime by `/api/session/:id/voice-token`.
 
 **Browser (default).** The Web Speech API for recognition and synthesis, with the Kwami's replies generated server-side by `/api/session/:id/reply`. Needs no keys, no worker and no room — which is why it is the default: a fresh clone is playable, and LiveKit becomes an upgrade rather than a prerequisite.
 
-**LiveKit.** When credentials are configured, the token endpoint mints a JWT scoped to the session's room. That is where this repository stops. The _agent_ — the worker that joins the room, runs streaming STT and TTS, and speaks as the Kwami — is a separate long-running service, because a Nitro request handler cannot hold a WebRTC session open for three minutes.
+**LiveKit.** When credentials are configured, the token endpoint mints a JWT scoped to the session's room and asks LiveKit to dispatch a named worker into it. The _agent_ — the thing that joins, runs streaming STT and TTS, and speaks as the Kwami — is still a separate long-running service, because a Nitro request handler cannot hold a WebRTC session open for three minutes. What this repository owns is the three surfaces that worker needs: the token and its dispatch claim, `/api/internal/voice/:id` for the persona and the phrase, and `/api/session/:id/voice-tick`, which bills the room by the second against the Kwami's energy. See [Energy](/docs/energy#metering-a-voice-connection).
 
-Either way, the win decision is identical and server-side: transcript turns go to `/api/session/:id/transcript`, which is the only place the secret is ever compared against anything.
+The dispatch claim carries a session id and nothing else, and the room's data channel carries no secret either — a player can decode their own token and reads everything published to their own room. The phrase reaches the worker over an authenticated server-to-server call or not at all.
+
+Either way, the win decision is identical and server-side: transcript turns go to `/api/session/:id/transcript`, which is the only place the secret is ever compared against anything. On the LiveKit path the worker relays what it heard to the player's browser, which posts it to that same route — so the claim material reaches the person who won it rather than the worker that transcribed it.
 
 ## Eventual consistency, on purpose
 

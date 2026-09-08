@@ -97,9 +97,15 @@ For streaming voice over WebRTC instead of the browser API:
 NUXT_PUBLIC_LIVEKIT_URL=wss://your-project.livekit.cloud
 NUXT_LIVEKIT_API_KEY=
 NUXT_LIVEKIT_API_SECRET=
+NUXT_LIVEKIT_AGENT_NAME=kwami-agent
+NUXT_AGENT_API_KEY=
 ```
 
-This repository mints the room tokens. The agent worker that joins the room and speaks as the Kwami is a separate service — see [Architecture](/docs/architecture#voice-and-where-it-stops). With the variables unset, `/api/session/:id/voice-token` reports `transport: "browser"` and the game runs on the Web Speech path.
+This repository mints the room tokens, dispatches the named agent into the room and bills the connection by the second. The worker itself — the thing that joins and speaks as the Kwami — is a separate service; see [Architecture](/docs/architecture#voice-and-where-it-stops) and [Energy](/docs/energy#metering-a-voice-connection).
+
+`NUXT_LIVEKIT_AGENT_NAME` empty dispatches nothing, which is the right setting for keys without a worker: a room the player can talk into and nothing that answers is worse than the browser path. `NUXT_AGENT_API_KEY` is the shared key that worker presents to read a session's persona and phrase, and without it that callback refuses every caller.
+
+With the LiveKit variables unset, `/api/session/:id/voice-token` and `/api/studio/voice-token` report `transport: "browser"` and the game runs on the Web Speech path — which is also what happens when the balance cannot pay for a second of voice.
 
 ### 5. On-ramp
 

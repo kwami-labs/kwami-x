@@ -116,14 +116,30 @@ Asks the Kwami to answer. Runs server-side because the persona prompt contains t
 
 ### `POST /api/session/:id/voice-token` — auth, player only
 
-Issues a LiveKit token scoped to this session's room, expiring in five minutes.
+Issues a LiveKit token scoped to this session's room and asks LiveKit to dispatch the named worker into it.
 
 ```json
-← { "transport": "livekit", "url": "wss://…", "room": "kwami-…", "token": "…" }
-← { "transport": "browser" }   // when LiveKit is not configured
+← { "transport": "livekit", "url": "wss://…", "room": "kwami-…", "token": "…", "secondsLeft": 150 }
+← { "transport": "browser", "reason": "starving" }   // no LiveKit, or no energy to pay for it
 ```
 
-Reports `transport: "browser"` rather than failing when LiveKit is absent, so the client falls back to the Web Speech path instead of the session dying. The token never grants room admin — a player must not be able to evict the agent from the room they are trying to beat.
+The token expires at the smaller of what is left on the clock and what the Kwami's energy can pay for — the ceiling half of [voice metering](/docs/energy#metering-a-voice-connection). It never grants room admin: a player must not be able to evict the agent from the room they are trying to beat. Its dispatch claim carries the session id and nothing else, because the player can decode their own token.
+
+Reports `transport: "browser"` rather than failing whenever the upgrade is unavailable, so the client falls back to the Web Speech path instead of the session dying.
+
+### `POST /api/session/:id/voice-tick` — auth, player only
+
+Bills the room for the seconds it has held open since the last tick. Takes no duration: the amount is computed from the session's chain-anchored `started_at`, because the balance being spent belongs to the Kwami's owner and not to the person on the microphone.
+
+```json
+← { "balance": "3500", "secondsLeft": 70, "starved": false }
+```
+
+`starved: true` is a 200, not a 402. The challenger paid for this window and keeps it — the client drops the room and finishes on the browser path.
+
+### `GET /api/internal/voice/:id` — agent key only
+
+Everything the voice worker needs to speak as this Kwami: persona, voice, game, guard strength, traits **and the phrase it is guarding**. The only route that returns a secret outside a verified win, and the reason it can is that it is server-to-server — authenticated by `X-Kwami-Agent-Key` against `NUXT_AGENT_API_KEY`, never by a user's session. Unset key is a 503; wrong key is a 401; a session that is over is a 409.
 
 ### `POST /api/session/:id/claimed` — auth, player only
 
@@ -196,6 +212,33 @@ worse than none: it would build confidence in behaviour that was never going to 
 
 Returns **402** when the balance cannot cover a reply. That is an outcome, not a failure: the
 creator has not done anything wrong, they have used the thing up, and the page offers them fuel.
+
+### `POST /api/studio/voice-token`
+
+The same rehearsal over a streaming connection. Opens a room for the account's own draft, with a
+token that expires when the trial allowance would.
+
+```json
+← { "transport": "livekit", "url": "wss://…", "room": "studio-…", "token": "…", "secondsLeft": 800 }
+← { "transport": "browser", "reason": "exhausted" }   // no LiveKit, no Supabase, or nothing left
+```
+
+The draft reaches the worker over the room's data channel rather than a callback — there is no row
+to call back about. That includes the phrase, which is safe here and nowhere else: the only
+participant is the creator, who typed it.
+
+### `POST /api/studio/voice-tick`
+
+Bills an open studio room against the trial allowance.
+
+```json
+→ { "seconds": 15 }
+← { "balance": "38250", "secondsLeft": 765 }
+```
+
+`seconds` is clamped server-side to one tick interval. Unlike the session tick it trusts the client
+to report at all, because the only balance it can spend is the caller's own. Returns **402** when
+the allowance runs out, and the studio shows the same "add fuel" notice a spent preview does.
 
 This is the one mutating-ish route that does **not** refuse in demo mode. Mutating routes return 503
 there because they would have to pretend to have written something; this one writes nothing, and the
