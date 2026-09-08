@@ -34,6 +34,19 @@ export default defineNuxtConfig({
     moonpaySecretKey: '',
     livekitApiKey: '',
     livekitApiSecret: '',
+    /**
+     * The named LiveKit agent to dispatch into a Kwami's room.
+     *
+     * Empty dispatches nothing, which is the right posture for a deployment
+     * with LiveKit keys but no worker running: a room the player can talk into
+     * and nothing that answers is worse than the browser path.
+     */
+    livekitAgentName: 'kwami-agent',
+    /**
+     * Shared key the voice worker presents to read a session's persona and
+     * secret. Server-to-server only — see `server/api/internal/voice/[id].get.ts`.
+     */
+    agentApiKey: '',
     openaiApiKey: '',
     anthropicApiKey: '',
 

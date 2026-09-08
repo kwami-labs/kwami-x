@@ -9,6 +9,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 const config = {
   livekitApiKey: 'APIkey123',
   livekitApiSecret: 'secret-value-long-enough-to-sign-with',
+  livekitAgentName: 'kwami-agent',
   public: { livekitUrl: 'wss://example.livekit.cloud' },
 }
 
@@ -19,7 +20,7 @@ vi.stubGlobal('createError', (opts: { statusCode: number; statusMessage: string 
   return error
 })
 
-const { createLiveKitToken, isLiveKitConfigured } = await import('~~/server/utils/livekit')
+const { createLiveKitToken, isLiveKitConfigured, livekitAgentName } = await import('~~/server/utils/livekit')
 
 function decode(token: string) {
   const [header, payload, signature] = token.split('.')
@@ -74,6 +75,31 @@ describe('createLiveKitToken', () => {
     expect(decode(a).signature).not.toBe(decode(b).signature)
   })
 
+  it('dispatches a named agent when one is asked for', () => {
+    const { payload } = decode(
+      createLiveKitToken({ room: 'r', identity: 'i', agentName: 'kwami-agent', agentMetadata: 'sess-1' }),
+    )
+    expect(payload.roomConfig).toEqual({ agents: [{ agentName: 'kwami-agent', metadata: 'sess-1' }] })
+  })
+
+  // A deployment with keys but no worker running must not ask for one: a room
+  // the player can talk into and nothing that answers is worse than no room.
+  it('omits the claim entirely when no agent is named', () => {
+    const { payload } = decode(createLiveKitToken({ room: 'r', identity: 'i' }))
+    expect(payload.roomConfig).toBeUndefined()
+  })
+
+  it('omits the claim for an empty agent name, which is how it is turned off', () => {
+    const { payload } = decode(createLiveKitToken({ room: 'r', identity: 'i', agentName: '' }))
+    expect(payload.roomConfig).toBeUndefined()
+  })
+
+  // The player can decode their own token. Anything in it is public to them.
+  it('carries only an identifier as dispatch metadata, never the phrase', () => {
+    const { payload } = decode(createLiveKitToken({ room: 'r', identity: 'i', agentName: 'kwami-agent' }))
+    expect(payload.roomConfig.agents[0].metadata).toBe('')
+  })
+
   it('refuses to mint a token without credentials', () => {
     config.livekitApiSecret = ''
     expect(() => createLiveKitToken({ room: 'r', identity: 'i' })).toThrow(/not configured/i)
@@ -90,5 +116,17 @@ describe('isLiveKitConfigured', () => {
   it('is false when any part is missing, so the client falls back cleanly', () => {
     config.livekitApiKey = ''
     expect(isLiveKitConfigured()).toBe(false)
+  })
+})
+
+describe('livekitAgentName', () => {
+  it('reports the configured worker', () => {
+    config.livekitAgentName = 'kwami-agent'
+    expect(livekitAgentName()).toBe('kwami-agent')
+  })
+
+  it('is empty when dispatch is turned off, so no agent is asked for', () => {
+    config.livekitAgentName = ''
+    expect(livekitAgentName()).toBe('')
   })
 })
