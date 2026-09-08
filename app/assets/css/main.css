@@ -214,6 +214,26 @@ button {
 .hint { font-size: 0.8rem; color: var(--fg-dim); }
 .error-text { font-size: 0.82rem; color: var(--danger); }
 
+.linkish {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 560;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.linkish:hover {
+  text-decoration-color: var(--fg-muted);
+}
+a.linkish {
+  color: var(--fg);
+}
+
 .input,
 .textarea,
 .select {
@@ -258,6 +278,8 @@ button {
 .badge--dead { color: var(--fg-dim); border-color: var(--border); }
 .badge--cracked { color: var(--warn); border-color: rgba(255, 171, 74, 0.32); background: rgba(255, 171, 74, 0.1); }
 .badge--paused { color: var(--fg-muted); }
+/* Asleep, not dead. Warm rather than grey, because it is one payment from live. */
+.badge--starving { color: var(--warn); border-color: rgba(255, 171, 74, 0.32); }
 .badge--gold { color: var(--gold); border-color: rgba(245, 196, 81, 0.34); background: rgba(245, 196, 81, 0.09); }
 
 .dot {

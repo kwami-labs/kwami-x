@@ -8,7 +8,7 @@
  * infrastructure exists, not to let someone believe they minted something.
  */
 
-import { isConfigured } from '#shared/config/configured'
+import { isSupabaseServerConfigured } from '#shared/config/supabase'
 
 export interface DemoKwami {
   id: string
@@ -253,7 +253,7 @@ export function demoSessions(kwami: DemoKwami, limit = 12, now = Date.now()): De
 
 export function isDemoMode(): boolean {
   const config = useRuntimeConfig()
-  return !isConfigured(config.public.supabaseUrl) || !isConfigured(config.supabaseServiceKey)
+  return !isSupabaseServerConfigured(config)
 }
 
 /** Refuse a write in demo mode with a message that explains what to do about it. */
@@ -262,7 +262,7 @@ export function assertNotDemo(): void {
     throw createError({
       statusCode: 503,
       statusMessage:
-        'Running in demo mode: no Supabase credentials configured. Copy .env.example to .env and fill in NUXT_PUBLIC_SUPABASE_URL and NUXT_SUPABASE_SERVICE_KEY.',
+        'Running in demo mode: no Supabase credentials configured. Copy .env.example to .env and fill in NUXT_PUBLIC_SUPABASE_PROJECT_ID, NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY and NUXT_SUPABASE_SECRET_KEY.',
     })
   }
 }

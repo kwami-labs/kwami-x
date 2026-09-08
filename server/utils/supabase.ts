@@ -1,16 +1,20 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { H3Event } from 'h3'
+import { resolveSupabaseUrl } from '#shared/config/supabase'
 
 /**
  * Two Supabase clients, with very different powers.
  *
- * `serviceClient()` bypasses row level security and is the only thing allowed
- * to read encrypted secrets or write settlement rows. It must never be handed
- * a value that came from a request body without validation.
+ * `serviceClient()` uses the secret key (`sb_secret_…`), bypasses row level
+ * security, and is the only thing allowed to read encrypted secrets or write
+ * settlement rows. It must never be handed a value that came from a request
+ * body without validation, and the secret must never reach the browser
+ * (`runtimeConfig.public` / `NUXT_PUBLIC_*`).
  *
- * `userClient()` carries the caller's JWT, so every query it runs is filtered
- * by the same RLS policies the browser would hit. Anything that answers "what
- * may *this* user see" should use it, so a policy bug fails closed.
+ * `userClient()` uses the publishable key plus the caller's JWT, so every
+ * query it runs is filtered by the same RLS policies the browser would hit.
+ * Anything that answers "what may *this* user see" should use it, so a policy
+ * bug fails closed.
  */
 
 let cachedService: SupabaseClient | null = null
@@ -18,8 +22,8 @@ let cachedService: SupabaseClient | null = null
 export function serviceClient(): SupabaseClient {
   if (cachedService) return cachedService
   const config = useRuntimeConfig()
-  const url = config.public.supabaseUrl as string
-  const key = config.supabaseServiceKey
+  const url = resolveSupabaseUrl(config)
+  const key = config.supabaseSecretKey as string
   if (!url || !key) {
     throw createError({ statusCode: 500, statusMessage: 'Supabase service credentials are not configured.' })
   }
@@ -32,7 +36,7 @@ export function serviceClient(): SupabaseClient {
 export function userClient(event: H3Event): SupabaseClient {
   const config = useRuntimeConfig()
   const token = getRequestToken(event)
-  return createClient(config.public.supabaseUrl as string, config.public.supabaseAnonKey as string, {
+  return createClient(resolveSupabaseUrl(config), config.public.supabasePublishableKey as string, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
   })

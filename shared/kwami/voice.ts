@@ -1,3 +1,5 @@
+import { NEUTRAL_TRAITS, readTraits, type TraitVector } from './traits'
+
 /**
  * The voice and the game.
  *
@@ -128,6 +130,25 @@ export interface KwamiVoiceConfigStored {
   language: string
   /** 0 = chatty, 1 = adversarial. Scales how hard the brain deflects. */
   guardStrength: number
+  /**
+   * Character, as six numbers. See `shared/kwami/traits.ts`.
+   *
+   * Distinct from `guardStrength` on purpose. Guard strength is a *game* rule —
+   * how hard the thing defends a pot, which a challenger is entitled to read
+   * before paying. The traits are who it is while it does that. A cruel Kwami
+   * that gives ground easily and a kind one that never does are both coherent,
+   * and collapsing the two into one slider made them impossible to express.
+   */
+  traits: TraitVector
+  /**
+   * Which archetype the creator started from, if any.
+   *
+   * Kept only so the studio can show the chosen card as selected on a reload.
+   * Nothing downstream reads it: the persona text and the trait vector are the
+   * configuration, and an archetype whose definition later changes must not
+   * retroactively alter a Kwami that was already minted from it.
+   */
+  personaId?: string
 }
 
 export const DEFAULT_VOICE_CONFIG: KwamiVoiceConfigStored = {
@@ -135,16 +156,20 @@ export const DEFAULT_VOICE_CONFIG: KwamiVoiceConfigStored = {
   gameId: DEFAULT_GAME_ID,
   language: 'en',
   guardStrength: 0.7,
+  traits: NEUTRAL_TRAITS,
 }
 
 /** Read the stored blob back, filling in anything a Kwami was minted without. */
 export function readVoiceConfig(voice: Record<string, unknown> | null | undefined): KwamiVoiceConfigStored {
   const raw = voice ?? {}
   const guard = typeof raw.guardStrength === 'number' ? raw.guardStrength : DEFAULT_VOICE_CONFIG.guardStrength
+  const personaId = typeof raw.personaId === 'string' && raw.personaId ? raw.personaId : undefined
   return {
     voiceId: voiceById(raw.voiceId as string | undefined).id,
     gameId: gameById(raw.gameId as string | undefined).id,
     language: typeof raw.language === 'string' && raw.language ? raw.language : DEFAULT_VOICE_CONFIG.language,
     guardStrength: Math.max(0, Math.min(1, guard)),
+    traits: readTraits(raw.traits),
+    ...(personaId ? { personaId } : {}),
   }
 }

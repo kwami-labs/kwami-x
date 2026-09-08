@@ -14,5 +14,6 @@
  */
 export function isConfigured(value: unknown): boolean {
   if (typeof value !== 'string' || value.trim() === '') return false
+  // `your-project` covers both the old URL host and the project-id placeholder.
   return !/your-project|your-server|\.{3}$|^(sk|pk|sb)_(test|publishable|secret)_\.{3}$/.test(value)
 }

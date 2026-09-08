@@ -49,7 +49,7 @@ const accounts = computed(() => {
   ].filter((a): a is { label: string; address: string; note: string } => Boolean(a.address))
 })
 
-const palette = computed(() => paletteFor(kwami.value ?? { mint: mint.value }))
+const look = computed(() => lookFor(kwami.value ?? { mint: mint.value }))
 const isOwner = computed(() => wallet.address && kwami.value?.owner_wallet === wallet.address)
 
 const embedSnippet = computed(
@@ -81,8 +81,11 @@ useSeoMeta({
     <section class="detail__stage card">
       <KwamiAvatar
         :renderer="kwami.renderer as never"
-        :color-a="palette.a"
-        :color-b="palette.b"
+        :skin="look.skin"
+        :color-a="look.palette.a"
+        :color-b="look.palette.b"
+        :color-c="look.palette.c"
+        :tuning="look.tuning"
         :vitality="kwami.vitality"
       />
       <span class="badge detail__state" :class="`badge--${kwami.state}`">
@@ -155,9 +158,21 @@ useSeoMeta({
               ? 'This Kwami is dead'
               : kwami.state === 'cracked'
                 ? 'Already cracked'
-                : 'Not accepting challengers'
+                : kwami.state === 'starving'
+                  ? 'Out of energy — it cannot answer'
+                  : 'Not accepting challengers'
           }}
         </button>
+        <!--
+          This is the layer that actually protects a challenger. A ticket is
+          paid on chain before any server sees it, so refusing in
+          `/api/session/start` would mean refusing someone who is already out of
+          pocket — saying so here, before the button, is what prevents it.
+        -->
+        <p v-if="kwami.state === 'starving'" class="hint">
+          Its owner has to top it up before it can take another challenger. Nothing has been lost — the pot is
+          untouched, and it comes straight back.
+        </p>
       </div>
 
       <div class="card stack gap-2">

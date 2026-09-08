@@ -15,7 +15,7 @@ const wallet = useWalletStore()
 const auth = useAuthStore()
 const play = usePlaySession(kwami as never)
 
-const palette = computed(() => paletteFor(kwami.value ?? { mint: mint.value }))
+const look = computed(() => lookFor(kwami.value ?? { mint: mint.value }))
 const chosenAsset = ref<Asset>('SOL')
 const micError = ref<string | null>(null)
 const level = ref(0)
@@ -105,8 +105,11 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
     <section class="play__stage">
       <KwamiAvatar
         :renderer="kwami.renderer as never"
-        :color-a="palette.a"
-        :color-b="palette.b"
+        :skin="look.skin"
+        :color-a="look.palette.a"
+        :color-b="look.palette.b"
+        :color-c="look.palette.c"
+        :tuning="look.tuning"
         :vitality="kwami.vitality"
         :level="level"
         :arousal="arousal"

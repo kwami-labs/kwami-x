@@ -38,6 +38,23 @@ It is appended **last**, so a failure anywhere earlier in the bundle costs the c
 An empty treasury adds no instruction at all, so a fresh clone pointed at devnet can mint
 without first inventing an address to pay.
 
+## Energy
+
+The mint commission and the ticket split are the platform's two charges on a Kwami's _money_. Energy
+is the third charge, and it is on its _running costs_ — the model calls and the speech that let it
+answer at all.
+
+It is a separate balance from the pot, and it has to be. The pot is escrow: the program has no
+instruction that spends it on anything but a payout, and an owner cannot withdraw from it while a
+challenger still has time on the clock. Paying for inference out of it would be spending the
+challengers' stake on the owner's overheads.
+
+A Kwami that runs out of energy goes `starving` — unlisted, selling no tickets, pot untouched — and
+comes straight back on a top-up. It is the one lifecycle transition in this system that reverses.
+
+Full treatment, including the rounding rules and the one place a ticket can still be stranded, in
+[Energy](/docs/energy).
+
 ## The payout
 
 The winner takes `payout_bps` of the pot — 80% by default, and the owner may set anything from 50% to 95% at mint.

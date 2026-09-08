@@ -112,9 +112,17 @@ export function parseSiwsMessage(text: string): SiwsMessage | null {
 }
 
 export interface SiwsValidationContext {
-  expectedDomain: string
+  /**
+   * Domain(s) this deployment answers on.
+   *
+   * Accept a list so local tunnels and `127.0.0.1` vs `localhost` do not fail
+   * a signature that Phantom correctly bound to the host the user actually saw.
+   */
+  expectedDomain: string | readonly string[]
   expectedNonce: string
   expectedAddress?: string
+  /** When set, the signed Chain ID must match (Phantom SIWS values). */
+  expectedChainId?: string
   now?: Date
 }
 
@@ -133,12 +141,16 @@ export interface SiwsValidation {
 export function validateSiwsMessage(m: SiwsMessage, ctx: SiwsValidationContext): SiwsValidation {
   const now = ctx.now ?? new Date()
 
-  if (m.domain !== ctx.expectedDomain) {
+  const domains = typeof ctx.expectedDomain === 'string' ? [ctx.expectedDomain] : ctx.expectedDomain
+  if (!domains.includes(m.domain)) {
     // The wallet showed the user *this* domain. A mismatch means the signature
     // was farmed on another site and replayed here.
     return { valid: false, reason: 'Domain mismatch.' }
   }
   if (m.version !== SIWS_VERSION) return { valid: false, reason: 'Unsupported SIWS version.' }
+  if (ctx.expectedChainId && m.chainId !== ctx.expectedChainId) {
+    return { valid: false, reason: 'Chain ID mismatch.' }
+  }
   if (m.nonce !== ctx.expectedNonce) return { valid: false, reason: 'Nonce mismatch or already used.' }
   if (ctx.expectedAddress && m.address !== ctx.expectedAddress) {
     return { valid: false, reason: 'Address mismatch.' }
@@ -159,11 +171,19 @@ export function validateSiwsMessage(m: SiwsMessage, ctx: SiwsValidationContext):
   return { valid: true }
 }
 
-/** CAIP-2 chain identifiers for the clusters Kwami runs on. */
+/**
+ * Chain IDs written into SIWS messages.
+ *
+ * These are the values Phantom's `signIn` accepts (see the SIWS ABNF:
+ * `mainnet` / `devnet` / `localnet` / `solana:mainnet` / …). Genesis-hash
+ * CAIP-2 ids look right on paper but Phantom rejects them, which breaks the
+ * one-click path and forces every login through the worse connect+signMessage
+ * fallback — or fails outright when `signIn` is present but finicky.
+ */
 export const SOLANA_CHAIN_IDS = {
-  'mainnet-beta': 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
-  devnet: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
-  localnet: 'solana:localnet',
+  'mainnet-beta': 'mainnet',
+  devnet: 'devnet',
+  localnet: 'localnet',
 } as const
 
 export const SIWS_STATEMENT =
