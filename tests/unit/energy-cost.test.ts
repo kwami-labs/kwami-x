@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  affordableVoiceSeconds,
   costOf,
   energyFromLamports,
   estimateSessionMicro,
@@ -10,6 +11,7 @@ import {
 import {
   CODEGEN_MICRO,
   DEFAULT_ENERGY_PER_SOL,
+  FREE_TRIAL_MICRO,
   MICRO_PER_ENERGY,
   REPLY_MICRO,
   VOICE_MICRO_PER_SECOND,
@@ -41,6 +43,33 @@ describe('costOf', () => {
     expect(costOf({ kind: 'voice', seconds: -5 })).toBe(0n)
     expect(costOf({ kind: 'voice', seconds: Number.NaN })).toBe(0n)
     expect(costOf({ kind: 'voice', seconds: Number.POSITIVE_INFINITY })).toBe(0n)
+  })
+})
+
+describe('affordableVoiceSeconds', () => {
+  it('converts a balance into whole seconds of talk', () => {
+    expect(affordableVoiceSeconds(VOICE_MICRO_PER_SECOND * 180n)).toBe(180)
+    expect(affordableVoiceSeconds(FREE_TRIAL_MICRO)).toBe(800)
+  })
+
+  // The mirror image of `costOf` rounding up. A ceiling that rounded up would
+  // grant a second the balance cannot pay for, and the charge for it would then
+  // be refused — one unpaid second per connection, every connection.
+  it('rounds down, so the ceiling is never more than the balance can pay', () => {
+    expect(affordableVoiceSeconds(VOICE_MICRO_PER_SECOND * 2n + 49n)).toBe(2)
+    expect(affordableVoiceSeconds(VOICE_MICRO_PER_SECOND - 1n)).toBe(0)
+  })
+
+  it('is zero for an empty or impossible balance, which is what refuses a room', () => {
+    expect(affordableVoiceSeconds(0n)).toBe(0)
+    expect(affordableVoiceSeconds(-100n)).toBe(0)
+  })
+
+  it('never quotes more than the charge for that many seconds costs', () => {
+    for (const micro of [0n, 1n, 49n, 50n, 51n, 999n, 40_000n, 123_456n]) {
+      const seconds = affordableVoiceSeconds(micro)
+      expect(costOf({ kind: 'voice', seconds })).toBeLessThanOrEqual(micro)
+    }
   })
 })
 

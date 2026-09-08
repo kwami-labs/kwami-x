@@ -2,13 +2,25 @@
 definePageMeta({ title: 'My Kwamis' })
 
 const wallet = useWalletStore()
+const auth = useAuthStore()
+
+/**
+ * Whose Kwamis to show.
+ *
+ * The linked wallet, not the connected one. Keying off the live connection made
+ * this page tell someone with a wallet linked to their account that they hold
+ * nothing, every time they opened it on a device where Phantom was not
+ * connected yet — which is most devices, most of the time.
+ */
+const owner = computed(() => auth.payoutAddress)
+
 const { data, pending, refresh } = await useFetch('/api/kwami', {
-  query: computed(() => ({ state: 'all', owner: wallet.address ?? '', limit: 60 })),
+  query: computed(() => ({ state: 'all', owner: owner.value ?? '', limit: 60 })),
   immediate: false,
 })
 
 watch(
-  () => wallet.address,
+  owner,
   (address) => {
     if (address) refresh()
   },
@@ -28,11 +40,19 @@ const mine = computed(() => data.value?.kwamis ?? [])
       <NuxtLink to="/mint" class="btn btn--primary">Mint another</NuxtLink>
     </header>
 
-    <div v-if="!wallet.isConnected" class="card stack gap-2">
-      <p class="muted">Connect your wallet to see what you hold.</p>
-      <button class="btn btn--primary" style="align-self: flex-start" @click="wallet.connect()">
-        Connect Phantom
-      </button>
+    <div v-if="!owner" class="card stack gap-2">
+      <p class="muted">Link a wallet to your account to see what you hold.</p>
+      <div class="row gap-2">
+        <button
+          v-if="!wallet.isConnected"
+          class="btn btn--primary"
+          style="align-self: flex-start"
+          @click="wallet.connect()"
+        >
+          Connect Phantom
+        </button>
+        <NuxtLink to="/me/profile" class="btn btn--ghost">Account</NuxtLink>
+      </div>
     </div>
 
     <div v-else-if="pending" class="card"><p class="dim">Loading…</p></div>

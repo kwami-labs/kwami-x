@@ -102,7 +102,7 @@ The application, the domain layer and the documentation are complete and tested:
 Two things are deliberately not finished, and neither is hidden:
 
 - **The Anchor program has never been compiled.** There is no Rust toolchain in this environment. It is written and reviewed by reading — a pass that caught three real defects, including a lamport debit the Solana runtime would reject outright — and the TypeScript suite pins the semantics it must reproduce. But reading is not compiling. Build it before trusting it, and do not put real money behind it.
-- **The LiveKit voice agent is a separate service.** This repo mints the room tokens; the worker that joins the room and speaks as the Kwami runs elsewhere. The game is fully playable in the meantime on the browser Web Speech path, which needs no infrastructure at all.
+- **The LiveKit voice agent is a separate service.** This repo mints the room tokens, dispatches the named worker, serves it the persona over an authenticated callback and bills the room by the second against the Kwami's energy — but the worker that joins and speaks as the Kwami runs elsewhere, and has not been pointed at this application yet. The game is fully playable in the meantime on the browser Web Speech path, which needs no infrastructure at all, and every one of those endpoints reports `transport: "browser"` rather than failing when the upgrade is not there.
 
 See [docs/security.md](docs/security.md#not-yet-done) for the rest of the honest list.
 

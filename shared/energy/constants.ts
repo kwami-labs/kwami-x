@@ -38,6 +38,22 @@ export const REPLY_MICRO = 1_000n
 export const VOICE_MICRO_PER_SECOND = 50n
 
 /**
+ * How often an open voice connection is billed.
+ *
+ * Shared because both ends need the same number for different reasons: the
+ * client uses it as its heartbeat interval, and the server uses it as the cap
+ * on how many seconds a single tick may claim. A client that reported its own
+ * elapsed time without that ceiling could bill an arbitrary number for one
+ * request.
+ *
+ * Fifteen seconds is the trade. Shorter bills more accurately when a connection
+ * drops between ticks; longer costs fewer requests. At fifteen the worst case —
+ * a tab closed the instant after a tick — is fifteen unbilled seconds, which is
+ * under a single energy unit.
+ */
+export const VOICE_TICK_SECONDS = 15
+
+/**
  * One run of the program builder.
  *
  * Two orders of magnitude above a reply, and honestly so: a generation spends a

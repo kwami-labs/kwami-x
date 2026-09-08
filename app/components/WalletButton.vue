@@ -90,6 +90,7 @@ async function onSignOut() {
 
         <div class="stack gap-1">
           <NuxtLink to="/me" class="popover__item" @click="open = false">My Kwamis</NuxtLink>
+          <NuxtLink to="/me/profile" class="popover__item" @click="open = false">Account</NuxtLink>
           <NuxtLink to="/me/sessions" class="popover__item" @click="open = false">Session history</NuxtLink>
           <button class="popover__item" @click="wallet.refreshBalances()">Refresh balance</button>
           <NuxtLink to="/onramp" class="popover__item popover__item--gold" @click="open = false">

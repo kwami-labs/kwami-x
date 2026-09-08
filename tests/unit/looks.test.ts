@@ -3,7 +3,7 @@ import { KWAMI_LOOKS, lookById, paletteOfLook } from '#shared/kwami/looks'
 import { KWAMI_PALETTES, TUNING_RANGES, toTuning } from '#shared/kwami/appearance'
 import { jitterTraits, randomKwami, randomPalette } from '#shared/kwami/random'
 import { KWAMI_PERSONAS } from '#shared/kwami/personas'
-import { KWAMI_SKINS, SKIN_FAMILIES, isSkin, skinDefinition } from '#shared/kwami/skins'
+import { KWAMI_SKINS, SKIN_FAMILIES, isSkin, skinDefinition, skinsOfFamily } from '#shared/kwami/skins'
 import { TRAIT_AXES } from '#shared/kwami/traits'
 
 const RENDERERS = ['blob-xyz', 'crystal-ball', 'orbital-shards', 'stars-genesis', 'black-hole']
@@ -32,6 +32,11 @@ describe('KWAMI_SKINS', () => {
   it('falls back to a real definition for an id this build does not know', () => {
     expect(skinDefinition('obsidian').id).toBe('radial')
     expect(skinDefinition(null).id).toBe('radial')
+  })
+
+  it('groups the catalogue by family without dropping anyone', () => {
+    const counted = SKIN_FAMILIES.flatMap((f) => skinsOfFamily(f.id))
+    expect(counted).toHaveLength(KWAMI_SKINS.length)
   })
 })
 

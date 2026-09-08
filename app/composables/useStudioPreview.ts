@@ -118,6 +118,37 @@ export function useStudioPreview() {
   }
 
   /**
+   * Record a turn that happened over the voice connection.
+   *
+   * On the LiveKit path the worker transcribes and answers, so `say` — which
+   * exists to make the HTTP round trip — must not run: it would charge a second
+   * reply for a question that has already been answered out loud. The
+   * transcript still has to show both sides of it.
+   */
+  function pushTurn(role: 'player' | 'kwami', text: string) {
+    if (turns.value.length === 0) startedAt = Date.now()
+    turns.value = [...turns.value, { role, text, at: Date.now() - startedAt }]
+  }
+
+  /**
+   * The voice connection ran the allowance out.
+   *
+   * `say` sets this from its own 402; a tick that fails does so inside the
+   * voice composable, which has no business knowing about this page's notice.
+   */
+  function markExhausted() {
+    exhausted.value = true
+  }
+
+  /**
+   * Note what a voice tick left in the balance, so the meter keeps moving while
+   * a connection is open rather than freezing between typed replies.
+   */
+  function noteBalance(micro: bigint) {
+    balance.value = micro
+  }
+
+  /**
    * Read the opening balance, so the meter shows a number before anything is
    * spent. A dash on a meter reads as broken rather than as "not started".
    */
@@ -141,5 +172,20 @@ export function useStudioPreview() {
     exhausted.value = false
   }
 
-  return { turns, thinking, activity, error, balance, source, exhausted, started, say, reset, loadBalance }
+  return {
+    turns,
+    thinking,
+    activity,
+    error,
+    balance,
+    source,
+    exhausted,
+    started,
+    say,
+    pushTurn,
+    noteBalance,
+    markExhausted,
+    reset,
+    loadBalance,
+  }
 }

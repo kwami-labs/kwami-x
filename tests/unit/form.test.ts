@@ -77,6 +77,10 @@ describe('applyPalette and applyHarmony', () => {
     expect(patch.colorC).toBe(KWAMI_PALETTES[3]!.c)
   })
 
+  it('ignores a palette that is not in the table', () => {
+    expect(applyPalette('not-a-palette')).toEqual({})
+  })
+
   it('rolls three colours that are all usable', () => {
     for (const harmony of KWAMI_HARMONIES) {
       const rng = seeded(7)
@@ -170,6 +174,11 @@ describe('linkAxes', () => {
       spikeY: TUNING_RANGES.spikeY.max,
       spikeZ: TUNING_RANGES.spikeZ.max,
     })
+  })
+
+  it('skips a key that is not a tunable, rather than writing NaN into it', () => {
+    const patch = linkAxes(initialFormState(), ['nope' as keyof typeof TUNING_RANGES], 1)
+    expect(patch.tuning).toEqual({})
   })
 })
 

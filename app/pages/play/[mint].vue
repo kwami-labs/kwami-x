@@ -47,7 +47,35 @@ const arousal = computed(() => {
 
 const urgent = computed(() => play.isLive.value && play.secondsLeft.value <= 30)
 
-async function beginVoice() {
+/**
+ * The metered upgrade, tried first.
+ *
+ * A worker in the room transcribes and answers in one streaming exchange
+ * instead of the browser transcribing and an HTTP round trip generating. It
+ * costs the Kwami energy per second, so `connect()` reports `browser` whenever
+ * it cannot be paid for — and that is not an error: it is the path this game
+ * has always run on.
+ */
+const voice = useVoiceLink({
+  tokenUrl: () => `/api/session/${play.sessionId.value}/voice-token`,
+  tickUrl: () => `/api/session/${play.sessionId.value}/voice-tick`,
+  onTranscript: async (role, text, confidence) => {
+    if (role === 'kwami') {
+      await play.recordKwamiTurn(text)
+      return
+    }
+    // The worker heard it; this route decides whether it won. Deliberately the
+    // same call the browser path makes, so `matchSecret` and the claim material
+    // stay on one route and a win reaches the player, not the worker.
+    const won = await play.submitUtterance(text, confidence)
+    if (won) void voice.disconnect()
+  },
+  // Mid-session exhaustion drops to the browser path rather than ending
+  // anything. The challenger paid for these minutes.
+  onExhausted: () => void beginBrowserVoice(),
+})
+
+async function beginBrowserVoice() {
   micError.value = null
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -61,6 +89,19 @@ async function beginVoice() {
   } catch {
     micError.value = 'Microphone access was refused. The whole game is voice, so it cannot start without it.'
   }
+}
+
+async function beginVoice() {
+  micError.value = null
+  if ((await voice.connect()) === 'livekit') {
+    const tick = () => {
+      level.value = voice.level()
+      levelRaf = requestAnimationFrame(tick)
+    }
+    levelRaf = requestAnimationFrame(tick)
+    return
+  }
+  await beginBrowserVoice()
 }
 
 async function onStart() {
@@ -77,6 +118,7 @@ watch(
     if (phase === 'expired' || phase === 'won') {
       speech.stop()
       cancelSpeech()
+      void voice.disconnect()
       stopMeter()
     }
   },
@@ -94,6 +136,7 @@ onBeforeUnmount(() => {
   cancelSpeech()
   stopMeter()
 })
+// `useVoiceLink` disconnects itself on unmount.
 
 useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Challenge') })
 </script>

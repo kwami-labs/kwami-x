@@ -29,6 +29,43 @@ A generation costs two orders of magnitude more than a reply, and honestly so: i
 
 Speech is priced per second rather than per minute because a session is billed for the speech that actually happened, and rounding a forty-second exchange up to a whole minute would overcharge by half.
 
+## Metering a voice connection
+
+A reply is a request: it arrives, it is charged, it is answered. A LiveKit room
+is not — it is a worker holding streaming recognition, a model and synthesis
+open for as long as somebody keeps talking, and nothing sends a request per
+second for it. So voice is metered in two halves.
+
+**The ceiling is the token.** `/api/session/:id/voice-token` and
+`/api/studio/voice-token` mint a credential whose lifetime is the smaller of
+what is left on the clock and `affordableVoiceSeconds(balance)`. It is the only
+moment at which a prepaid limit can actually be enforced, because it is the only
+moment the server is asked for anything. A balance that cannot buy one whole
+second gets no token at all — the caller is told `transport: "browser"` and uses
+the free path.
+
+**The heartbeat is the charge.** While connected, the client posts a tick every
+`VOICE_TICK_SECONDS`, and that is what spends the balance. A closing tick fires
+on disconnect, so a call that ends between heartbeats still pays for its tail.
+
+The two surfaces meter differently, and the difference is about who is paying.
+
+|              | Studio, pre-mint                | Session                          |
+| ------------ | ------------------------------- | -------------------------------- |
+| Pays         | `account_energy.trial_micro`    | `kwamis.energy_micro`            |
+| Payer is     | the person on the microphone    | someone else — the Kwami's owner |
+| Seconds from | the client, capped at one tick  | the server, from `started_at`    |
+| Running out  | 402, and the studio offers fuel | falls back to the browser path   |
+
+A creator rehearsing their own draft can only over-report against their own
+allowance, so a per-tick cap is enough there. A _challenger_ reporting seconds
+would be naming a number to charge the owner's Kwami — a drain on somebody
+else's balance, held open by a loop — so `charge_session_voice` takes no
+duration at all and computes it from the session's own start time, which came
+off the chain. It advances `game_sessions.voice_charged_ms` only when the debit
+succeeded, so two ticks arriving together charge once and a tick that could not
+be paid for leaves the time still owed.
+
 ## Rounding
 
 **Debits round up. Credits round down.**
@@ -97,11 +134,12 @@ What that costs, stated plainly: the platform is the counterparty for energy. It
 
 ## Schema
 
-| Table / column        |                                                       |
-| --------------------- | ----------------------------------------------------- |
-| `kwamis.energy_micro` | the live balance, beside the row it belongs to        |
-| `energy_ledger`       | append-only audit trail, one row per credit and debit |
-| `account_energy`      | the pre-mint trial allowance, one row per account     |
+| Table / column                   |                                                        |
+| -------------------------------- | ------------------------------------------------------ |
+| `kwamis.energy_micro`            | the live balance, beside the row it belongs to         |
+| `energy_ledger`                  | append-only audit trail, one row per credit and debit  |
+| `account_energy`                 | the pre-mint trial allowance, one row per account      |
+| `game_sessions.voice_charged_ms` | how much of a session's clock has been billed as voice |
 
 `energy_ledger` is deliberately shaped like `valuations`: a cached scalar is only trustworthy if there is a record you can replay it from. `balance_after` is stored rather than derived so a corrupted balance can be _detected_, not merely recomputed into agreeing with itself.
 
@@ -116,3 +154,4 @@ The ledger is readable by the Kwami's author only. How heavily a Kwami is being 
 - `shared/energy/state.ts` — `full` / `low` / `starving`, and the lifecycle fold
 - `shared/energy/receipt.ts` — reading a payment off a transaction
 - `server/utils/energy.ts` — the plumbing, and nothing else
+- `app/composables/useVoiceLink.ts` — the metered connection, and the fallback

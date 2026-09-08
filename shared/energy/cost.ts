@@ -61,6 +61,24 @@ export function costOf(op: EnergyOp): bigint {
 }
 
 /**
+ * How many whole seconds of speech a balance can pay for.
+ *
+ * The ceiling a voice connection is capped at: a token minted for longer than
+ * this is a promise the balance cannot keep, and the only way to enforce a
+ * prepaid limit on a stream nobody is watching per-second is to refuse to issue
+ * the credential past it.
+ *
+ * Rounds **down**, and deliberately so even though this is a debit-side number:
+ * it is a quote for how much can be bought, and `costOf` rounds the actual
+ * charge up. Granting the partial second here and charging for it there would
+ * hand out one second of unpaid speech per connection.
+ */
+export function affordableVoiceSeconds(micro: bigint): number {
+  if (micro <= 0n) return 0
+  return Number(micro / VOICE_MICRO_PER_SECOND)
+}
+
+/**
  * Roughly what one session will cost, for the "you can afford N more" line.
  *
  * An estimate and named as one. The replies figure is a typical count, not a

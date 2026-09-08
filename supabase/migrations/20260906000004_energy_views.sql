@@ -17,7 +17,15 @@
  * `security_invoker` matters: without it the view would run as its owner and
  * quietly bypass the row level security on `kwamis`, exposing drafts.
  */
-create or replace view public.kwamis_public
+-- Dropped rather than replaced. `create or replace view` may only *append*
+-- columns, and the energy pair belongs beside the rest of a Kwami's state
+-- rather than tacked on after `author_avatar` — so replacing in place fails
+-- with "cannot change name of view column". `leaderboard` selects from this
+-- one and has to go first; both are recreated below, in this same migration.
+drop view if exists public.leaderboard;
+drop view if exists public.kwamis_public;
+
+create view public.kwamis_public
 with (security_invoker = true)
 as
 select
@@ -92,7 +100,7 @@ left join public.profiles p on p.id = k.author_id;
  * It comes back the moment it is topped up, holding whatever rank its pot
  * earns, because nothing about the pot changed while it was asleep.
  */
-create or replace view public.leaderboard
+create view public.leaderboard
 with (security_invoker = true)
 as
 select

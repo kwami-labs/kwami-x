@@ -8,9 +8,24 @@ const props = defineProps<{
   exhausted: boolean
   /** Set when the phrase is not yet valid — the Kwami has nothing to guard. */
   blocked?: string | null
+  /**
+   * The draft to hand the voice worker.
+   *
+   * A function rather than an object so the worker is given whatever the studio
+   * looks like at the moment the connection opens, not whatever it looked like
+   * when this component mounted.
+   */
+  draftConfig?: () => Record<string, unknown>
 }>()
 
-const emit = defineEmits<{ say: [text: string]; reset: []; fuel: [] }>()
+const emit = defineEmits<{
+  say: [text: string]
+  turn: [role: 'player' | 'kwami', text: string]
+  exhausted: []
+  balance: [micro: bigint]
+  reset: []
+  fuel: []
+}>()
 
 const draft = ref('')
 const micError = ref<string | null>(null)
@@ -39,10 +54,47 @@ function submit() {
   emit('say', text)
 }
 
-function toggleMic() {
+/**
+ * The metered upgrade over `useSpeech`, when the account can pay for it.
+ *
+ * Streaming both ways instead of a typed round trip, billed per second against
+ * the same trial allowance a typed reply spends. `connect()` reporting
+ * `browser` covers every reason it might not be available — no LiveKit, no
+ * worker, no allowance left — and each of them means fall back rather than
+ * fail.
+ */
+const voice = useVoiceLink({
+  tokenUrl: '/api/studio/voice-token',
+  tickUrl: '/api/studio/voice-tick',
+  config: () => props.draftConfig?.() ?? {},
+  onTranscript: (role, text) => emit('turn', role, text),
+  // Out of allowance mid-sentence. The page's existing "Add fuel" notice is
+  // the right place for that to land, and it already exists.
+  onExhausted: () => emit('exhausted'),
+})
+
+watch(voice.balance, (micro) => {
+  if (micro !== null) emit('balance', micro)
+})
+
+const listening = computed(() => voice.connected.value || speech.listening.value)
+
+async function toggleMic() {
   micError.value = null
-  if (speech.listening.value) speech.stop()
-  else speech.start()
+  if (listening.value) {
+    speech.stop()
+    await voice.disconnect()
+    return
+  }
+  if ((await voice.connect()) === 'livekit') return
+  // No metered room to open, so the browser has to do it — and on Firefox it
+  // cannot. Typing is still there, which is why this is a note and not a
+  // failure.
+  if (!speech.supported.value) {
+    micError.value = 'This browser cannot listen. Type instead, or open the studio in Chrome.'
+    return
+  }
+  speech.start()
 }
 
 onBeforeUnmount(() => speech.stop())
@@ -76,14 +128,13 @@ onBeforeUnmount(() => speech.stop())
           @keydown.enter.prevent="submit"
         />
         <button
-          v-if="speech.supported.value"
           type="button"
           class="btn btn--sm drive__mic"
-          :class="{ 'drive__mic--on': speech.listening.value }"
-          :title="speech.listening.value ? 'Stop listening' : 'Speak instead'"
+          :class="{ 'drive__mic--on': listening }"
+          :title="listening ? 'Stop listening' : 'Speak instead'"
           @click="toggleMic"
         >
-          {{ speech.listening.value ? '● Listening' : '🎙' }}
+          {{ listening ? '● Listening' : '🎙' }}
         </button>
         <button
           type="button"
