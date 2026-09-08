@@ -275,11 +275,16 @@ const testBlocked = computed(() =>
 
 function testDraft() {
   return {
+    name: form.name.trim(),
     persona: form.persona.trim(),
     gameId: form.gameId,
     guardStrength: form.guardStrength,
     traits: form.traits,
     secret: form.secret,
+    // Only the voice path reads these; `/api/studio/preview` ignores the extra
+    // keys. The worker needs to know which voice to speak in, and the studio is
+    // the one place that choice exists without a row to read it from.
+    voiceId: form.voiceId,
   }
 }
 
@@ -771,7 +776,11 @@ async function onSubmit() {
             :error="studio.error.value"
             :exhausted="studio.exhausted.value"
             :blocked="testBlocked"
+            :draft-config="testDraft"
             @say="studio.say($event, testDraft())"
+            @turn="studio.pushTurn"
+            @exhausted="studio.markExhausted"
+            @balance="studio.noteBalance"
             @reset="studio.reset()"
             @fuel="goTo('economics')"
           />
