@@ -55,6 +55,8 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
   const claim = ref<ClaimMaterial | null>(null)
   const claimSignature = ref<string | null>(null)
   const winSummary = ref<{ matchedText?: string; score?: number } | null>(null)
+  /** The Kwami has run out of energy and is answering from its script. */
+  const starved = ref(false)
 
   // A local clock so the countdown ticks without a request per second. It is
   // display only — the server and the program both use the on-chain time.
@@ -187,15 +189,45 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
     return false
   }
 
+  /**
+   * Record a reply the voice worker spoke, on the LiveKit path.
+   *
+   * The worker generates and speaks the answer itself, so `askKwami` must not
+   * run — it would charge a second reply and produce a second answer nobody
+   * heard. The turn still has to reach the transcript, which is the only record
+   * of the conversation the player can read back afterwards.
+   */
+  async function recordKwamiTurn(text: string): Promise<void> {
+    if (!sessionId.value || !isLive.value) return
+    const at = Math.max(0, Date.now() - startedAt.value * 1000)
+    transcript.value.push({ role: 'kwami', text, at })
+    try {
+      await api(`/api/session/${sessionId.value}/transcript`, {
+        method: 'POST',
+        body: { role: 'kwami', text, at },
+      })
+    } catch {
+      // The player has already heard it. Losing the row is not worth an error.
+    }
+  }
+
   /** Ask the Kwami to answer, and record its reply. */
   async function askKwami(utterance: string): Promise<string | null> {
     if (!sessionId.value) return null
     const at = Math.max(0, Date.now() - startedAt.value * 1000)
     try {
-      const { text } = await api<{ text: string }>(`/api/session/${sessionId.value}/reply`, {
-        method: 'POST',
-        body: { utterance, at },
-      })
+      const { text, starved: isStarved } = await api<{ text: string; starved?: boolean }>(
+        `/api/session/${sessionId.value}/reply`,
+        {
+          method: 'POST',
+          body: { utterance, at },
+        },
+      )
+      // The Kwami ran out of energy and dropped to its scripted deflector. Said
+      // out loud, because otherwise a player concludes it simply got worse at
+      // the game — and the endpoint has reported this since it was written
+      // without anything ever reading it.
+      starved.value = Boolean(isStarved)
       transcript.value.push({ role: 'kwami', text, at: Math.max(0, Date.now() - startedAt.value * 1000) })
       return text
     } catch {
@@ -307,6 +339,8 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
     buyTicket,
     submitUtterance,
     askKwami,
+    recordKwamiTurn,
+    starved,
     claimWin,
   }
 }
