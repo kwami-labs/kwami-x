@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import type { Session, User } from '@supabase/supabase-js'
 import bs58 from 'bs58'
 import { createApiFetch } from '~/utils/api'
+import { isPlaceholderEmail } from '#shared/auth/profile'
 
 export interface BoundWallet {
   chain: 'solana' | 'ethereum'
@@ -40,16 +41,55 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const ready = ref(false)
 
-  /** Solana addresses already proven to the server, so a reconnect does not re-prompt. */
-  const boundAddresses = ref<string[]>([])
+  /** Wallets already proven to the server, so a reconnect does not re-prompt. */
+  const wallets = ref<BoundWallet[]>([])
+
+  /** Solana addresses proven for this account. */
+  const boundAddresses = computed(() =>
+    wallets.value.filter((w) => w.chain === 'solana').map((w) => w.address),
+  )
+
+  /**
+   * The wallet this account is paid at.
+   *
+   * The primary flag is the record; falling back to the first bound address
+   * covers a row written before the flag existed rather than showing someone
+   * "no payout wallet" while one is plainly linked.
+   */
+  const primaryAddress = computed(
+    () =>
+      wallets.value.find((w) => w.chain === 'solana' && w.isPrimary)?.address ??
+      boundAddresses.value[0] ??
+      null,
+  )
 
   const isSignedIn = computed(() => user.value !== null)
   const displayName = computed(() => {
     const meta = user.value?.user_metadata
-    return (meta?.display_name as string) ?? (meta?.full_name as string) ?? user.value?.email ?? null
+    return (
+      (meta?.display_name as string) ??
+      (meta?.full_name as string) ??
+      // The synthetic mailbox a wallet sign-in invents is not a name to show
+      // anybody — it reads as a bug to the person it belongs to.
+      (isPlaceholderEmail(user.value?.email) ? null : user.value?.email) ??
+      null
+    )
   })
-  /** The Solana address this account can actually be paid at. */
+
+  /** The email someone could actually recover this account with, if there is one. */
+  const recoveryEmail = computed(() =>
+    isPlaceholderEmail(user.value?.email) ? null : (user.value?.email ?? null),
+  )
+  /**
+   * The Solana address this account can actually be paid at.
+   *
+   * Table first, then the JWT's cached copy — which is readable before the
+   * wallet list has loaded, and is what makes a page render the right owner on
+   * the very first tick instead of flashing an empty state. The connected
+   * wallet is the last resort, for someone who has not linked anything yet.
+   */
   const payoutAddress = computed(() => {
+    if (primaryAddress.value) return primaryAddress.value
     const meta = user.value?.user_metadata
     if (meta?.wallet_chain === 'solana') return meta.wallet_address as string
     return wallet.address
@@ -65,6 +105,9 @@ export const useAuthStore = defineStore('auth', () => {
         session.value = next
         user.value = next?.user ?? null
         if (next?.user) void loadWallets()
+        // A signed-out tab holding on to the last account's wallet list would
+        // keep showing it as linked, and offer to unlink it.
+        else wallets.value = []
       })
     } finally {
       // Even a failed read is a finished one. Leaving `ready` false on error
@@ -108,19 +151,26 @@ export const useAuthStore = defineStore('auth', () => {
    * same address last week — a prompt with nothing to approve is how users
    * learn to click through prompts without reading them.
    */
-  async function bindWallet(): Promise<boolean> {
+  async function bindWallet(makePrimary = false): Promise<boolean> {
     if (!import.meta.client || !user.value || !wallet.address) return false
     const address = wallet.address
-    if (boundAddresses.value.includes(address)) return true
+    // An explicit "pay me here" still has to go through, even for an address
+    // that is already linked — that request is about the primary flag.
+    if (!makePrimary && boundAddresses.value.includes(address)) return true
 
     try {
       const { nonce } = await $fetch<{ nonce: string }>('/api/auth/nonce', { method: 'POST', body: {} })
       const signed = await wallet.signIn(nonce)
-      const { wallets } = await authedFetch<{ wallets: BoundWallet[] }>('/api/me/wallet', {
+      const { wallets: next } = await authedFetch<{ wallets: BoundWallet[] }>('/api/me/wallet', {
         method: 'POST',
-        body: { message: signed.message, signature: bs58.encode(signed.signature), address: signed.address },
+        body: {
+          message: signed.message,
+          signature: bs58.encode(signed.signature),
+          address: signed.address,
+          makePrimary,
+        },
       })
-      boundAddresses.value = wallets.filter((w) => w.chain === 'solana').map((w) => w.address)
+      wallets.value = next
       return true
     } catch (e) {
       // A refused signature is a choice, not a fault. The user stays signed in
@@ -130,14 +180,38 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** Read back the addresses already proven for this account. */
+  /** Read back the wallets already proven for this account. */
   async function loadWallets() {
     if (!import.meta.client || !user.value) return
     try {
-      const { wallets } = await authedFetch<{ wallets: BoundWallet[] }>('/api/me/wallet')
-      boundAddresses.value = wallets.filter((w) => w.chain === 'solana').map((w) => w.address)
+      const { wallets: next } = await authedFetch<{ wallets: BoundWallet[] }>('/api/me/wallet')
+      wallets.value = next
     } catch {
-      boundAddresses.value = []
+      wallets.value = []
+    }
+  }
+
+  /**
+   * Drop a wallet from this account.
+   *
+   * No signature: giving up a claim needs no proof, and the account is the only
+   * thing that could want to. The server re-picks a payout wallet from what is
+   * left, so unlinking the primary one cannot leave money addressed to a wallet
+   * this account no longer says is theirs.
+   */
+  async function unlinkWallet(address: string): Promise<boolean> {
+    if (!user.value) return false
+    error.value = null
+    try {
+      const { wallets: next } = await authedFetch<{ wallets: BoundWallet[] }>('/api/me/wallet', {
+        method: 'DELETE',
+        query: { address },
+      })
+      wallets.value = next
+      return true
+    } catch (e) {
+      error.value = describeAuthError(e)
+      return false
     }
   }
 
@@ -169,6 +243,36 @@ export const useAuthStore = defineStore('auth', () => {
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     })
     if (e) fail(e.message)
+    loading.value = false
+  }
+
+  /**
+   * Attach or change the email this account can be recovered with.
+   *
+   * The reason this exists is the wallet accounts. Signing in with Phantom
+   * mints a synthetic mailbox nobody can read, so losing the wallet loses the
+   * account — the profile page is where that dead end gets an exit. Supabase
+   * only moves the address once the link in it is clicked, so the account is
+   * unchanged until the new inbox has proven it exists.
+   */
+  async function updateEmail(email: string) {
+    loading.value = true
+    error.value = null
+    const { error: e } = await supabase.auth.updateUser(
+      { email },
+      { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    )
+    if (e) fail(e.message)
+    loading.value = false
+  }
+
+  /** Set a password, so email is a way back in and not just an address on file. */
+  async function updatePassword(password: string) {
+    loading.value = true
+    error.value = null
+    const { data, error: e } = await supabase.auth.updateUser({ password })
+    if (e) fail(e.message)
+    user.value = data.user
     loading.value = false
   }
 
@@ -316,7 +420,7 @@ export const useAuthStore = defineStore('auth', () => {
     await supabase.auth.signOut()
     user.value = null
     session.value = null
-    boundAddresses.value = []
+    wallets.value = []
   }
 
   return {
@@ -327,19 +431,25 @@ export const useAuthStore = defineStore('auth', () => {
     ready,
     isSignedIn,
     displayName,
+    recoveryEmail,
     payoutAddress,
     init,
     signInWithEmail,
     signUpWithEmail,
     resetPassword,
+    updateEmail,
+    updatePassword,
     signInWithPhone,
     verifyPhone,
     signInWithOAuth,
     signInWithPhantom,
     signInWithMetaMask,
+    wallets,
     boundAddresses,
+    primaryAddress,
     bindWallet,
     loadWallets,
+    unlinkWallet,
     authedFetch,
     signOut,
   }
