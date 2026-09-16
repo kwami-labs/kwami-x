@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatSiwsMessage, SIWS_STATEMENT, SOLANA_CHAIN_IDS, type SiwsMessage } from '#shared/auth/siws'
+import { formatSiwsMessage, SIWS_STATEMENT, type SiwsMessage } from '#shared/auth/siws'
 
 /**
  * `verifySignedSiws` is the single gate for both login and wallet bind. The
@@ -36,7 +36,6 @@ const BASE: SiwsMessage = {
   statement: SIWS_STATEMENT,
   uri: 'https://x.kwami.io',
   version: '1',
-  chainId: SOLANA_CHAIN_IDS.devnet,
   nonce: 'nonce-abc',
   issuedAt: new Date().toISOString(),
 }
@@ -115,11 +114,15 @@ describe('verifySignedSiws', () => {
     ).resolves.toEqual({ address: ADDRESS })
   })
 
-  it('rejects a message signed for the wrong cluster', async () => {
-    const wrongChain = formatSiwsMessage({ ...BASE, chainId: 'mainnet' })
-    await expect(verifySignedSiws(signed({ message: wrongChain }))).rejects.toMatchObject({
-      statusCode: 400,
-      message: /chain id/i,
-    })
+  // Phantom decides the chain id, not this app: it writes in whichever network
+  // the wallet is on. A devnet deployment must therefore still let in a wallet
+  // sitting on mainnet, or nobody with default settings can log in at all.
+  it('accepts a message whose chain id is not the deployment cluster', async () => {
+    const mainnet = formatSiwsMessage({ ...BASE, chainId: 'mainnet' })
+    await expect(verifySignedSiws(signed({ message: mainnet }))).resolves.toEqual({ address: ADDRESS })
+  })
+
+  it('accepts a message with no chain id at all', async () => {
+    await expect(verifySignedSiws(signed())).resolves.toEqual({ address: ADDRESS })
   })
 })

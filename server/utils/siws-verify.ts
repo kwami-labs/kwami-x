@@ -1,7 +1,6 @@
 import bs58 from 'bs58'
 import type { H3Event } from 'h3'
-import { parseSiwsMessage, validateSiwsMessage, SOLANA_CHAIN_IDS } from '#shared/auth/siws'
-import type { Cluster } from '#shared/solana/constants'
+import { parseSiwsMessage, validateSiwsMessage } from '#shared/auth/siws'
 import { consumeNonce } from './nonce'
 import { verifySolanaSignature } from './solana'
 
@@ -59,13 +58,11 @@ export async function verifySignedSiws(
 
   const siteHost = new URL(config.public.siteUrl as string).host
   const expectedDomain = opts.expectedDomains ?? siteHost
-  const cluster = (config.public.solanaCluster as Cluster) || 'devnet'
 
   const validation = validateSiwsMessage(parsed, {
     expectedDomain,
     expectedNonce: parsed.nonce,
     expectedAddress: parsed.address,
-    expectedChainId: SOLANA_CHAIN_IDS[cluster],
   })
   if (!validation.valid) throw createError({ statusCode: 400, statusMessage: validation.reason })
 

@@ -17,7 +17,16 @@ export interface SiwsMessage {
   statement?: string
   uri: string
   version: string
-  chainId: string
+  /**
+   * Optional, and deliberately not set by this app.
+   *
+   * Phantom refuses to render a sign-in request whose chain id disagrees with
+   * the network the wallet is currently on, so pinning it to our cluster locks
+   * out everyone whose Phantom is on mainnet — which is everyone, by default.
+   * Signing in proves key ownership and touches no chain, so there is nothing
+   * worth pinning. Parsed when a wallet fills one in; never required.
+   */
+  chainId?: string
   nonce: string
   issuedAt: string
   expirationTime?: string
@@ -40,14 +49,9 @@ export function formatSiwsMessage(m: SiwsMessage): string {
 
   if (m.statement) lines.push('', m.statement)
 
-  lines.push(
-    '',
-    `URI: ${m.uri}`,
-    `Version: ${m.version}`,
-    `Chain ID: ${m.chainId}`,
-    `Nonce: ${m.nonce}`,
-    `Issued At: ${m.issuedAt}`,
-  )
+  lines.push('', `URI: ${m.uri}`, `Version: ${m.version}`)
+  if (m.chainId) lines.push(`Chain ID: ${m.chainId}`)
+  lines.push(`Nonce: ${m.nonce}`, `Issued At: ${m.issuedAt}`)
 
   if (m.expirationTime) lines.push(`Expiration Time: ${m.expirationTime}`)
   if (m.resources?.length) {
@@ -80,7 +84,7 @@ export function parseSiwsMessage(text: string): SiwsMessage | null {
   const chainId = field('Chain ID')
   const nonce = field('Nonce')
   const issuedAt = field('Issued At')
-  if (!uri || !version || !chainId || !nonce || !issuedAt) return null
+  if (!uri || !version || !nonce || !issuedAt) return null
 
   // Everything between the address and the blank line before `URI:` is the
   // statement, when one is present.
@@ -121,8 +125,6 @@ export interface SiwsValidationContext {
   expectedDomain: string | readonly string[]
   expectedNonce: string
   expectedAddress?: string
-  /** When set, the signed Chain ID must match (Phantom SIWS values). */
-  expectedChainId?: string
   now?: Date
 }
 
@@ -148,9 +150,10 @@ export function validateSiwsMessage(m: SiwsMessage, ctx: SiwsValidationContext):
     return { valid: false, reason: 'Domain mismatch.' }
   }
   if (m.version !== SIWS_VERSION) return { valid: false, reason: 'Unsupported SIWS version.' }
-  if (ctx.expectedChainId && m.chainId !== ctx.expectedChainId) {
-    return { valid: false, reason: 'Chain ID mismatch.' }
-  }
+  // Chain ID is deliberately not checked. Nothing attests it — it is a field
+  // the dapp asks for and the wallet fills in from whichever network the user
+  // happens to be on — so enforcing it rejects honest logins without turning
+  // away a single forged one. Domain, nonce, address and freshness do that work.
   if (m.nonce !== ctx.expectedNonce) return { valid: false, reason: 'Nonce mismatch or already used.' }
   if (ctx.expectedAddress && m.address !== ctx.expectedAddress) {
     return { valid: false, reason: 'Address mismatch.' }
@@ -170,21 +173,6 @@ export function validateSiwsMessage(m: SiwsMessage, ctx: SiwsValidationContext):
 
   return { valid: true }
 }
-
-/**
- * Chain IDs written into SIWS messages.
- *
- * These are the values Phantom's `signIn` accepts (see the SIWS ABNF:
- * `mainnet` / `devnet` / `localnet` / `solana:mainnet` / …). Genesis-hash
- * CAIP-2 ids look right on paper but Phantom rejects them, which breaks the
- * one-click path and forces every login through the worse connect+signMessage
- * fallback — or fails outright when `signIn` is present but finicky.
- */
-export const SOLANA_CHAIN_IDS = {
-  'mainnet-beta': 'mainnet',
-  devnet: 'devnet',
-  localnet: 'localnet',
-} as const
 
 export const SIWS_STATEMENT =
   'Sign in to Kwami. This proves you control this wallet. It does not approve any transaction or move any funds.'

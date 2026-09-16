@@ -3,7 +3,6 @@ import {
   formatSiwsMessage,
   parseSiwsMessage,
   SIWS_STATEMENT,
-  SOLANA_CHAIN_IDS,
   validateSiwsMessage,
   type SiwsMessage,
 } from '#shared/auth/siws'
@@ -14,7 +13,6 @@ const BASE: SiwsMessage = {
   statement: SIWS_STATEMENT,
   uri: 'https://x.kwami.io',
   version: '1',
-  chainId: SOLANA_CHAIN_IDS.devnet,
   nonce: 'abc123',
   issuedAt: '2026-09-04T12:00:00.000Z',
 }
@@ -30,6 +28,10 @@ describe('formatSiwsMessage', () => {
     const text = formatSiwsMessage({ ...BASE, statement: undefined, expirationTime: undefined })
     expect(text).not.toContain('Expiration Time')
     expect(text).not.toContain(SIWS_STATEMENT)
+    // Phantom refuses to display a request whose chain id disagrees with the
+    // network the wallet is on, so we send none — an empty `Chain ID:` line
+    // would be worse than the omission it is standing in for.
+    expect(text).not.toContain('Chain ID')
   })
 
   it('lists resources as a bulleted block', () => {
@@ -42,6 +44,8 @@ describe('parseSiwsMessage', () => {
   it('round-trips every field', () => {
     const message: SiwsMessage = {
       ...BASE,
+      // A wallet may write a chain id in even though we never ask for one.
+      chainId: 'mainnet',
       expirationTime: '2026-09-04T12:05:00.000Z',
       resources: ['a', 'b'],
     }
@@ -91,10 +95,13 @@ describe('validateSiwsMessage', () => {
     ).toBe(true)
   })
 
-  it('rejects a chain id that does not match the deployment cluster', () => {
-    const result = validateSiwsMessage(BASE, { ...ctx, expectedChainId: 'mainnet' })
-    expect(result.valid).toBe(false)
-    expect(result.reason).toMatch(/chain id/i)
+  // The chain id is whatever network the signer's wallet was on. Rejecting one
+  // that disagrees with the deployment cluster turns away honest logins — the
+  // common case, since Phantom defaults to mainnet — and stops no forgery,
+  // because a forger picks the field's value too.
+  it('does not care which chain id the wallet wrote in', () => {
+    expect(validateSiwsMessage({ ...BASE, chainId: 'mainnet' }, ctx).valid).toBe(true)
+    expect(validateSiwsMessage({ ...BASE, chainId: undefined }, ctx).valid).toBe(true)
   })
 
   it('rejects a nonce that was not the one issued', () => {

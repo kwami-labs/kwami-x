@@ -105,6 +105,12 @@ The Phantom binding is hand-written (`app/utils/phantom.ts`) rather than `@solan
 
 There is a `signMessage` fallback for wallets that do not implement SIWS. It constructs the byte-identical message so the server verifies both paths the same way.
 
+### No chain id
+
+Neither path sets `chainId`. Phantom checks that field against the network the wallet is currently on and refuses to render the request when the two disagree — "the chain ID does not match the provided chain ID for verification" — so a devnet deployment is unreachable from a wallet on mainnet, which is every wallet by default. The fallback does not rescue it either: Phantom applies the same check to any `signMessage` payload it recognises as SIWS, so both prompts fail for one reason.
+
+Nothing is lost by omitting it. Signing in proves control of a key and touches no chain, and the field is unattested anyway — the dapp asks for a value and the wallet writes one in, so enforcing it turns away honest logins without turning away a single forged one. The server parses a chain id when a wallet supplies one and ignores it. Replay is stopped by the domain, the nonce, the address and the freshness window.
+
 ### Mobile
 
 Mobile browsers cannot host the extension. `phantomDeeplink()` builds a universal link that reopens the current page inside Phantom's in-app browser, where the provider _is_ injected.

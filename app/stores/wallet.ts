@@ -10,9 +10,8 @@ import {
   waitForPhantom,
   type PhantomProvider,
 } from '~/utils/phantom'
-import { SIWS_STATEMENT, SIWS_VERSION, SOLANA_CHAIN_IDS, formatSiwsMessage } from '#shared/auth/siws'
+import { SIWS_STATEMENT, SIWS_VERSION, formatSiwsMessage } from '#shared/auth/siws'
 import { USDC_BASE_UNITS } from '#shared/game/constants'
-import type { Cluster } from '#shared/solana/constants'
 
 export type WalletStatus = 'disconnected' | 'connecting' | 'connected' | 'unavailable'
 
@@ -160,9 +159,14 @@ export const useWalletStore = defineStore('wallet', () => {
    * not implement SIWS, building the byte-identical message ourselves so the
    * server verifies both paths the same way.
    *
-   * Every optional SIWS field the server requires (`uri`, `version`, `chainId`)
-   * is passed in: Phantom only puts a field into the signed message when the
-   * dapp supplies it, and our parser rejects messages that omit them.
+   * `uri` and `version` are passed explicitly because Phantom only writes a
+   * field into the signed message when the dapp supplies it, and the server's
+   * parser requires both. `chainId` is pointedly *not* passed: Phantom checks
+   * it against the network the wallet is currently on and refuses to render
+   * the request at all when the two disagree, which fails every login from a
+   * mainnet Phantom against a devnet deployment — and fails the `signMessage`
+   * fallback too, since Phantom applies the same check to any message it
+   * recognises as SIWS. Sign-in touches no chain, so there is nothing to pin.
    */
   async function signIn(nonce: string): Promise<{ message: string; signature: Uint8Array; address: string }> {
     const p = provider ?? (await waitForPhantom())
@@ -178,8 +182,6 @@ export const useWalletStore = defineStore('wallet', () => {
     provider = p
     bindProviderEvents(p)
 
-    const cluster = config.public.solanaCluster as Cluster
-    const chainId = SOLANA_CHAIN_IDS[cluster]
     const domain = window.location.host
     const uri = window.location.origin
     const issuedAt = new Date().toISOString()
@@ -193,7 +195,6 @@ export const useWalletStore = defineStore('wallet', () => {
             uri,
             version: SIWS_VERSION,
             nonce,
-            chainId,
             issuedAt,
           }),
         )
@@ -219,7 +220,6 @@ export const useWalletStore = defineStore('wallet', () => {
       statement: SIWS_STATEMENT,
       uri,
       version: SIWS_VERSION,
-      chainId,
       nonce,
       issuedAt,
     })
