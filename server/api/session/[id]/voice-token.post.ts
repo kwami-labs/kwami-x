@@ -67,8 +67,12 @@ export default defineEventHandler(async (event) => {
       agentName: livekitAgentName(),
       // The session id and nothing else. The player can decode their own token,
       // so the persona and the phrase it is guarding travel over
-      // `/api/internal/voice/:id` instead, where only the worker can read them.
-      agentMetadata: session.id,
+      // `/api/internal/kwamis/:id/runtime` instead, where only the worker can read them.
+      // A JSON object, not the bare id: `resolve_kwami_id` parses this claim
+      // as JSON and reads `kwami_id` from it, and anything else resolves to
+      // nothing — a worker that joins the room and never learns what it is
+      // guarding.
+      agentMetadata: JSON.stringify({ kwami_id: session.id }),
     }),
   }
 })

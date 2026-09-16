@@ -245,7 +245,14 @@ export function usePlaySession(kwami: Ref<PlayKwami | null>) {
    * the win would still be claimable from the transaction alone.
    */
   async function claimWin() {
-    if (!claim.value || !kwami.value || !wallet.publicKey) return
+    if (!claim.value || !kwami.value) return
+    if (!wallet.publicKey) {
+      // The wallet can go between winning and claiming — Phantom locked, an
+      // account switched in the extension. Of every button on the site, the one
+      // that collects the money is the worst to have quietly do nothing.
+      error.value = 'Connect a wallet first.'
+      return
+    }
     error.value = null
     phase.value = 'claiming'
 

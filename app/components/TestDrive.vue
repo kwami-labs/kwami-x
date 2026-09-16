@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TranscriptTurn } from '#shared/types/kwami'
+import type { KwamiAgentDraft } from '#shared/kwami/agent-config'
 
 const props = defineProps<{
   turns: TranscriptTurn[]
@@ -12,10 +13,10 @@ const props = defineProps<{
    * The draft to hand the voice worker.
    *
    * A function rather than an object so the worker is given whatever the studio
-   * looks like at the moment the connection opens, not whatever it looked like
-   * when this component mounted.
+   * looks like at the moment it is read — on connect, and again on every edit
+   * while the room stays open.
    */
-  draftConfig?: () => Record<string, unknown>
+  draftConfig: () => KwamiAgentDraft
 }>()
 
 const emit = defineEmits<{
@@ -66,7 +67,7 @@ function submit() {
 const voice = useVoiceLink({
   tokenUrl: '/api/studio/voice-token',
   tickUrl: '/api/studio/voice-tick',
-  config: () => props.draftConfig?.() ?? {},
+  config: () => props.draftConfig(),
   onTranscript: (role, text) => emit('turn', role, text),
   // Out of allowance mid-sentence. The page's existing "Add fuel" notice is
   // the right place for that to land, and it already exists.
@@ -87,6 +88,11 @@ async function toggleMic() {
     return
   }
   if ((await voice.connect()) === 'livekit') return
+  // A room that refused to open says so. Falling back is correct — no keys, no
+  // worker, no allowance all land here legitimately — but a *failure* that
+  // falls back silently reads as a dead button, and the creator has no way to
+  // tell "your account is out of energy" from "your microphone is blocked".
+  if (voice.error.value) micError.value = voice.error.value
   // No metered room to open, so the browser has to do it — and on Firefox it
   // cannot. Typing is still there, which is why this is a note and not a
   // failure.

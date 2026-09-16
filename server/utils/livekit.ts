@@ -40,7 +40,7 @@ export interface TokenGrant {
    * handed to the player, who can decode their own token — a secret here would
    * be a secret published to the one person the game exists to keep it from.
    * The agent trades this identifier for the real configuration over
-   * `/api/internal/voice/:id`, which is authenticated and server-to-server.
+   * `/api/internal/kwamis/:id/runtime`, which is authenticated and server-to-server.
    */
   agentMetadata?: string
 }
@@ -95,6 +95,21 @@ export function createLiveKitToken(grant: TokenGrant): string {
   if (grant.agentName) {
     payload.roomConfig = {
       agents: [{ agentName: grant.agentName, metadata: grant.agentMetadata ?? '' }],
+      // How long the room outlives the people in it.
+      //
+      // This is not tuning, it is the difference between a Kwami that answers
+      // and one that never speaks. LiveKit dispatches the agents named above
+      // when the room is *created*, and ignores the claim for a room that
+      // already exists — so a room that lingers after everyone has gone is a
+      // room the next connection joins with no worker in it and no way to ask
+      // for one. At LiveKit's defaults (300s empty, 20s departure) that is
+      // every rehearsal for five minutes after the first.
+      //
+      // Short enough that the room is gone before anyone comes back, long
+      // enough to survive the reconnect LiveKit does on a network blip, which
+      // does not count as leaving.
+      emptyTimeout: 60,
+      departureTimeout: 10,
     }
   }
 

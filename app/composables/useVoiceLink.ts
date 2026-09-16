@@ -1,6 +1,12 @@
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import type { Room, RemoteTrack, RemoteParticipant } from 'livekit-client'
 import { VOICE_TICK_SECONDS } from '#shared/energy/constants'
+import {
+  agentConfigMessage,
+  agentSoulUpdate,
+  agentVoiceUpdate,
+  type KwamiAgentDraft,
+} from '#shared/kwami/agent-config'
 import { createAudioMeter, type AudioMeter } from '~/utils/audio-meter'
 
 /**
@@ -25,6 +31,14 @@ import { createAudioMeter, type AudioMeter } from '~/utils/audio-meter'
  * caps the token's lifetime at what could be afforded when it was issued; this
  * timer is what actually spends it, and what notices when it is gone.
  */
+
+/**
+ * How long a slider has to sit still before the worker is told about it.
+ *
+ * Long enough that a drag is one update rather than sixty; short enough that
+ * the change lands inside the same breath the creator is listening to.
+ */
+const CONFIG_DEBOUNCE_MS = 400
 
 export type VoiceTransport = 'livekit' | 'browser'
 
@@ -54,10 +68,14 @@ export interface VoiceLinkOptions {
   /**
    * The draft configuration to hand the worker, for a Kwami that has no row to
    * look up. Studio only — a session's worker reads its own configuration from
-   * `/api/internal/voice/:id`, because room data reaches the player too and a
+   * `/api/internal/kwamis/:id/runtime`, because room data reaches the player too and a
    * session's phrase is the one thing they must not be given.
+   *
+   * Read again on every edit, not just on connect: the studio's argument is
+   * that you tune the character while listening to it, so a slider moved
+   * mid-sentence has to reach the worker that is already talking.
    */
-  config?: () => Record<string, unknown>
+  config?: () => KwamiAgentDraft
   /**
    * A turn the worker transcribed or spoke.
    *
@@ -93,6 +111,13 @@ export function useVoiceLink(options: VoiceLinkOptions) {
   let meter: AudioMeter | null = null
   let ticker: ReturnType<typeof setInterval> | null = null
   let lastTick = 0
+  /** The worker's audio, attached to the document so it plays. */
+  const speakers: HTMLMediaElement[] = []
+  /** Set once the worker has joined; nothing can be configured before that. */
+  let agentPresent = false
+  /** The voice last sent, so a soul edit does not needlessly respin the TTS. */
+  let sentVoiceId: string | undefined
+  let configTimer: ReturnType<typeof setTimeout> | null = null
 
   /** Microphone level in [0, 1], for the avatar. Zero when not connected. */
   function level(): number {
@@ -164,12 +189,22 @@ export function useVoiceLink(options: VoiceLinkOptions) {
         const element = track.attach()
         element.style.display = 'none'
         document.body.appendChild(element)
+        // Kept so `disconnect` can take it out again. `attach()` puts an
+        // element in the document and nothing removes it, so every reconnect
+        // left another live audio sink behind — by the third rehearsal the
+        // worker was being played through three of them at once. Tracked here
+        // rather than cleaned up on `TrackUnsubscribed`, which does not fire
+        // reliably when it is this side that closes the room.
+        speakers.push(element)
       }
     })
     next.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       // The draft only has to reach the worker, and the worker only exists once
       // it has joined. Sending on connect would publish into an empty room.
-      if (options.config) void publishConfig(next, participant)
+      noteWorker(next, participant)
+    })
+    next.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+      if (isWorker(participant)) agentPresent = false
     })
     next.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
       if (!options.onTranscript) return
@@ -204,6 +239,11 @@ export function useVoiceLink(options: VoiceLinkOptions) {
     connected.value = true
     secondsLeft.value = issued.secondsLeft ?? null
 
+    // A dispatch that beat the browser into the room fires no
+    // `ParticipantConnected`, and an unconfigured worker is a generic assistant
+    // with none of the character the creator is here to audition.
+    for (const participant of next.remoteParticipants.values()) noteWorker(next, participant)
+
     const track = next.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
     const stream = track?.mediaStream
     if (stream) meter = createAudioMeter(stream)
@@ -213,13 +253,71 @@ export function useVoiceLink(options: VoiceLinkOptions) {
     return 'livekit'
   }
 
-  async function publishConfig(target: Room, participant: RemoteParticipant) {
-    if (!participant.identity.startsWith('agent')) return
-    const payload = new TextEncoder().encode(JSON.stringify(options.config!()))
-    await target.localParticipant.publishData(payload, { reliable: true })
+  /**
+   * The worker, as opposed to another person in the room.
+   *
+   * LiveKit names a dispatched agent `agent-<job id>`. Nothing else in a studio
+   * room is remote, but the check is cheap and a configuration message carries
+   * the draft's phrase — it must only ever be addressed to the worker.
+   */
+  function isWorker(participant: RemoteParticipant): boolean {
+    return participant.identity.startsWith('agent')
+  }
+
+  function send(message: unknown) {
+    if (!room || !agentPresent) return
+    const payload = new TextEncoder().encode(JSON.stringify(message))
+    void room.localParticipant.publishData(payload, { reliable: true })
+  }
+
+  /** First contact: rebuild the worker around this draft. */
+  function noteWorker(target: Room, participant: RemoteParticipant) {
+    if (!isWorker(participant) || !options.config) return
+    agentPresent = true
+    const draft = options.config()
+    sentVoiceId = draft.voiceId
+    const payload = new TextEncoder().encode(JSON.stringify(agentConfigMessage(draft)))
+    void target.localParticipant.publishData(payload, { reliable: true })
+  }
+
+  /**
+   * An edit, while the room is open.
+   *
+   * A soul update patches the running agent's instructions, so the conversation
+   * continues through it. A voice change has to respin the TTS, so it is only
+   * sent when the voice actually changed — otherwise every nudge of a trait
+   * slider would restart the synthesiser mid-word.
+   */
+  function pushConfigUpdate() {
+    if (!options.config) return
+    const draft = options.config()
+    send(agentSoulUpdate(draft))
+    if (draft.voiceId !== sentVoiceId) {
+      sentVoiceId = draft.voiceId
+      send(agentVoiceUpdate(draft))
+    }
+  }
+
+  // Coalesced: a creator dragging a slider produces a change per frame, and
+  // each one would otherwise rebuild the worker's prompt.
+  if (options.config) {
+    watch(
+      () => JSON.stringify(options.config!()),
+      () => {
+        if (!agentPresent) return
+        if (configTimer) clearTimeout(configTimer)
+        configTimer = setTimeout(pushConfigUpdate, CONFIG_DEBOUNCE_MS)
+      },
+    )
   }
 
   async function disconnect() {
+    if (configTimer) {
+      clearTimeout(configTimer)
+      configTimer = null
+    }
+    agentPresent = false
+    sentVoiceId = undefined
     if (ticker) {
       clearInterval(ticker)
       ticker = null
@@ -229,6 +327,7 @@ export function useVoiceLink(options: VoiceLinkOptions) {
     }
     meter?.stop()
     meter = null
+    for (const element of speakers.splice(0)) element.remove()
     if (room) {
       await room.disconnect()
       room = null
