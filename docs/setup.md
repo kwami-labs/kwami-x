@@ -107,6 +107,48 @@ This repository mints the room tokens, dispatches the named agent into the room 
 
 With the LiveKit variables unset, `/api/session/:id/voice-token` and `/api/studio/voice-token` report `transport: "browser"` and the game runs on the Web Speech path — which is also what happens when the balance cannot pay for a second of voice.
 
+#### Running the worker locally
+
+Voice needs three processes, and the studio's rehearsal only works when all of
+them are up:
+
+| Process          | Port | What it does                                                 |
+| ---------------- | ---- | ------------------------------------------------------------ |
+| This app         | 3000 | Mints the room token, meters the connection, holds the draft |
+| `kwami-lk-agent` | —    | Joins the room, runs STT/LLM/TTS, speaks as the Kwami        |
+| `kwami-lk-api`   | 8080 | What the worker reports usage to (`KWAMI_API_URL`)           |
+
+All three must point at the **same** LiveKit project: `NUXT_PUBLIC_LIVEKIT_URL`
+here, `LIVEKIT_URL` in the other two. `NUXT_LIVEKIT_AGENT_NAME` must match the
+name the worker registers under (`kwami-agent`, in its `agent/livekit.toml`), or
+the token dispatches a worker that does not exist and the room stays silent.
+
+```bash
+cd ../kwami-lk-agent && make dev     # registers the worker
+cd ../kwami-lk-api   && make dev     # usage + credits on :8080
+```
+
+A worker deployed to LiveKit Cloud registers under the same name and will
+compete for jobs with a local one, so stop the deployed agent while developing
+against it.
+
+#### Configuring a draft over the room
+
+A minted Kwami has a row the worker can read. A draft in the studio does not —
+it only exists in the browser — so `useVoiceLink` publishes it over the room's
+data channel instead, in the shape `kwami-lk-agent` parses: a `config` message
+on join, then a `config_update` on every edit while the room stays open. That
+second message is what makes the sliders live: `update_soul` rebuilds the
+worker's instructions on the running agent, so the character changes without
+dropping the conversation.
+
+Two keys on that message are deliberate. `greeting: false` suppresses the
+worker's default introduction, which is an assistant's opening and wrong for
+something whose whole character is that it volunteers nothing.
+`memory: {enabled: false}` keeps a rehearsal out of the worker's shared
+`kwami_default` namespace — a draft has no id to file memory under, and the
+studio promises the creator that nothing here is saved.
+
 ### 5. On-ramp
 
 ```env
