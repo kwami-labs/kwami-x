@@ -18,13 +18,30 @@ import { voiceById } from './voice'
  */
 
 /**
- * The model the Kwami thinks with, on every path.
+ * The model the HTTP brain thinks with.
  *
- * Exported so `kwami-brain` and the voice worker cannot drift apart: they are
- * meant to be the same character, and a model swapped in one place only is the
- * easiest way for that to stop being true.
+ * Exported rather than inlined so the voice worker can be pointed at the same
+ * one: they are meant to be the same character, and a model swapped in one
+ * place only is the easiest way for that to stop being true.
  */
 export const BRAIN_MODEL = 'claude-sonnet-5'
+
+/**
+ * The model the *voice worker* thinks with, which is deliberately not
+ * `BRAIN_MODEL` today.
+ *
+ * They should be the same, and the only reason they are not is billing: the
+ * Anthropic account behind `NUXT_ANTHROPIC_API_KEY` has no credit, and the two
+ * paths fail very differently when a model refuses. `respond()` catches and
+ * drops to the scripted deflector, so a typed rehearsal degrades. The worker has
+ * no such fallback — an LLM that returns 400 is a Kwami that hears the
+ * challenger and never answers, in a session someone paid for.
+ *
+ * Fund the Anthropic account and this becomes
+ * `{ provider: 'anthropic', model: BRAIN_MODEL }`, which is the intended
+ * configuration and is already wired end to end.
+ */
+export const VOICE_LLM = { provider: 'openai', model: 'gpt-4o-mini' } as const
 
 export interface KwamiAgentDraft extends KwamiPromptInput {
   name?: string
@@ -88,11 +105,9 @@ export function agentConfigMessage(draft: KwamiAgentDraft) {
     voice: {
       tts: { provider: 'openai', model: 'tts-1', voice: voiceById(draft.voiceId).openai },
       stt: { provider: 'deepgram', model: 'nova-2', language: draft.language ?? 'en' },
-      // The same model `kwami-brain` runs. The worker defaults to gpt-4o-mini,
-      // which made a Kwami sound like one character when typed to and a
-      // different one when spoken to — the studio cannot audition a character
-      // that only exists on one of the two paths.
-      llm: { provider: 'anthropic', model: BRAIN_MODEL },
+      // Named rather than left to the worker's default, so which model speaks
+      // as a Kwami is a decision in this file. See `VOICE_LLM`.
+      llm: { ...VOICE_LLM },
     },
   }
 }

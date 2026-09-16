@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildKwamiPrompt } from '#shared/kwami/prompt'
 import {
-  BRAIN_MODEL,
+  VOICE_LLM,
   agentConfigMessage,
   agentSoulUpdate,
   agentVoiceUpdate,
@@ -71,11 +71,10 @@ describe('agentConfigMessage', () => {
     expect(message.soul.responseLength).toBe('short')
   })
 
-  it('runs the same model the HTTP brain runs', () => {
-    // The worker defaults to gpt-4o-mini. A Kwami that sounds like one
-    // character when typed to and another when spoken to is not a character
-    // the studio can audition.
-    expect(message.voice.llm).toEqual({ provider: 'anthropic', model: BRAIN_MODEL })
+  it('names the model rather than leaving it to the worker default', () => {
+    // Which model speaks as a Kwami is a decision that belongs in the codebase,
+    // not in whatever the worker happens to default to this release.
+    expect(message.voice.llm).toEqual({ ...VOICE_LLM })
   })
 
   it('declines the generic introduction', () => {
