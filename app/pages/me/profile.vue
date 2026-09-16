@@ -106,8 +106,28 @@ async function onSavePassword() {
   }
 }
 
+/**
+ * Either half of "connect and link" can fail, and they report to different
+ * places — `wallet.error` for the wallet leg, `auth.error` for the signature.
+ * This page only ever rendered the second, so a missing or locked Phantom left
+ * the button looking like it did nothing at all.
+ */
+const linkError = computed(() => auth.error ?? wallet.error)
+
+function clearLinkError() {
+  auth.error = null
+  wallet.error = null
+}
+
+const linkLabel = computed(() => {
+  if (linking.value) return 'Waiting for Phantom…'
+  if (wallet.isConnected) return 'Link this wallet'
+  return wallet.status === 'unavailable' ? 'Get Phantom' : 'Connect and link'
+})
+
 async function onLinkConnected() {
   linking.value = true
+  clearLinkError()
   try {
     if (!wallet.isConnected) await wallet.connect()
     if (wallet.isConnected) await auth.bindWallet()
@@ -319,10 +339,10 @@ const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-6)
         :disabled="linking"
         @click="onLinkConnected"
       >
-        {{ linking ? 'Waiting for Phantom…' : wallet.isConnected ? 'Link this wallet' : 'Connect and link' }}
+        {{ linkLabel }}
       </button>
 
-      <p v-if="auth.error" class="error-text" @click="auth.error = null">{{ auth.error }}</p>
+      <p v-if="linkError" class="error-text" @click="clearLinkError">{{ linkError }}</p>
     </section>
   </div>
 </template>

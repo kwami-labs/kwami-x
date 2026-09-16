@@ -62,7 +62,15 @@ async function act(action: 'publish' | 'pause') {
       <h1>Manage</h1>
     </header>
 
-    <div v-if="!isOwner" class="card">
+    <!-- `isOwner` needs an address to compare, so a disconnected owner used to
+         be told, flatly, that this Kwami was not theirs — on the one route that
+         exists only for the person it belongs to, with nothing to press. -->
+    <div v-if="!wallet.isConnected" class="card stack gap-2">
+      <p class="muted">Connect the wallet that holds this Kwami to publish or pause it.</p>
+      <ConnectWallet />
+    </div>
+
+    <div v-else-if="!isOwner" class="card">
       <p class="muted">You do not hold this Kwami.</p>
     </div>
 

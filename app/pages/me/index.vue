@@ -43,14 +43,7 @@ const mine = computed(() => data.value?.kwamis ?? [])
     <div v-if="!owner" class="card stack gap-2">
       <p class="muted">Link a wallet to your account to see what you hold.</p>
       <div class="row gap-2">
-        <button
-          v-if="!wallet.isConnected"
-          class="btn btn--primary"
-          style="align-self: flex-start"
-          @click="wallet.connect()"
-        >
-          Connect Phantom
-        </button>
+        <ConnectWallet v-if="!wallet.isConnected" />
         <NuxtLink to="/me/profile" class="btn btn--ghost">Account</NuxtLink>
       </div>
     </div>

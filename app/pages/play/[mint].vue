@@ -221,9 +221,7 @@ useSeoMeta({ title: () => (kwami.value ? `Challenge ${kwami.value.name}` : 'Chal
           Demo mode — no Supabase or Solana configured, so tickets cannot be bought. See
           <NuxtLink to="/docs/setup" class="gold">setup</NuxtLink>.
         </div>
-        <button v-else-if="!wallet.isConnected" class="btn btn--primary btn--block" @click="wallet.connect()">
-          Connect Phantom
-        </button>
+        <ConnectWallet v-else-if="!wallet.isConnected" block />
         <button
           v-else-if="!auth.isSignedIn"
           class="btn btn--primary btn--block"

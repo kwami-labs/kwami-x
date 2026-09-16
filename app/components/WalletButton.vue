@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PHANTOM_INSTALL_URL, isPhantomInstalled } from '~/utils/phantom'
-
 const wallet = useWalletStore()
 const auth = useAuthStore()
 const gate = useAuthGate()
@@ -14,15 +12,8 @@ onClickOutside(menu, () => (open.value = false))
 const bound = computed(() => Boolean(wallet.address && auth.boundAddresses.includes(wallet.address)))
 
 async function onConnect() {
-  // `unavailable` is a three-second verdict reached on mount, and Phantom does
-  // not always inject inside three seconds — `waitForPhantom` exists because of
-  // it. Trusting that verdict alone sent people who have Phantom installed to
-  // the download page. Re-check synchronously, because the popup has to open on
-  // this click's gesture and an `await` first would lose it.
-  if (wallet.status === 'unavailable' && !isPhantomInstalled()) {
-    window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener')
-    return
-  }
+  // `connect()` owns the "no Phantom here" case — install page on desktop,
+  // universal link on a phone — so every button on the site behaves the same.
   await wallet.connect()
   // Connecting is a browser-level grant; it proves nothing to the server. Ask
   // for the signature straight after, while the user is still in the flow they
