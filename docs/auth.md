@@ -113,6 +113,30 @@ Mobile browsers cannot host the extension. `phantomDeeplink()` builds a universa
 
 `waitForPhantom()` polls and listens for `phantom#initialized` for up to three seconds. Phantom does not inject synchronously on every browser — Firefox in particular can land the provider after `DOMContentLoaded` — and showing "install Phantom" to somebody who already has it is worse than a short wait.
 
+That verdict is not final. If the wait gives up, `autoConnect()` leaves a one-shot `phantom#initialized` listener behind and re-runs when it fires. Without it, `status: 'unavailable'` was a permanent conclusion reached in the first three seconds of the session, and everything keyed off it — the "Get Phantom" button label, the sign-in panel's _no Phantom detected_ hint — went on contradicting a wallet that was sitting right there.
+
+### Connecting {#connecting}
+
+Every connect path goes through `useWalletStore()`. `connect()` and `signIn()` both call one `requireProvider()`, and when there is no provider it offers the way out rather than reporting a failure:
+
+| Situation           | What happens                                                                |
+| ------------------- | --------------------------------------------------------------------------- |
+| Desktop, no Phantom | Opens `PHANTOM_INSTALL_URL` in a new tab                                    |
+| Phone               | Assigns the universal link, reopening the page inside Phantom's browser     |
+| Phantom present     | Connects, and reports a refusal through `describeWalletError(e, 'connect')` |
+
+This lives in the store because it used to live in a component. `WalletButton` knew to offer the install page; the "Connect Phantom" buttons on mint, play, top-up and the account pages did not, and a store that only set `status: 'unavailable'` and an error string nobody rendered left them looking inert — a button that visibly did nothing when pressed. `ConnectWallet.vue` is the inline version of that button, and it exists so the error has somewhere to render on every page that offers one.
+
+Two constraints shape the code and are easy to undo by accident:
+
+**The check has to be synchronous.** Opening a tab needs the click's own user gesture. `requireProvider()` reads `getPhantomProvider()` directly and only falls back to the three-second `waitForPhantom()` when the mount-time verdict has not already settled the question — an `await` in front of `window.open` spends the gesture and the popup blocker eats the install page.
+
+**The `connecting` status is borrowed, not owned.** `requireProvider()` sets it while it waits, then hands it back. `signIn()` can throw before it ever reaches a status of its own, and a status left on `connecting` disables every wallet button on the page until reload.
+
+### Being disconnected is not the same as not owning
+
+Ownership is a property of the account, not of whatever Phantom currently has unlocked. Pages that compare a live `wallet.address` against `owner_wallet` answer "no" for an owner who simply has not connected yet — `/kwami/<mint>/manage` told them, flatly, that they did not hold their own Kwami. Where the answer only decides what to _show_, a wallet already proven against the session (`auth.boundAddresses`) settles it without a signature; the signature is required only to publish, pause or claim.
+
 ## MetaMask
 
 MetaMask signs a standard EIP-4361 message. Recovery is done with `@noble/curves` rather than viem or ethers: the only Ethereum operation Kwami performs is recovering an address from a `personal_sign` signature, and a full client library is several hundred kilobytes of transitive dependency for one elliptic-curve call.

@@ -13,7 +13,7 @@ bun run test:coverage  # with thresholds
 - **`unit`** — the pure domain modules, in plain Node with no Nuxt involvement. Fast enough to leave in watch mode while editing game rules.
 - **`integration`** — anything touching components, composables or auto-imports, in `happy-dom`.
 
-487 tests across 38 files. Coverage of the logic layers sits at **96.1% lines / 91.5% branches**.
+579 tests across 43 files. Coverage of the logic layers sits at **97.1% lines / 92.8% branches**.
 
 ## What is covered
 
@@ -36,6 +36,10 @@ The matcher tests are where the design is actually pinned down. It has to accept
 **`eth.test.ts`** — signature recovery against a real signing round trip, including a message with non-ASCII characters, which recovers the wrong address if the EIP-191 length is measured in characters instead of bytes.
 
 **`demo.test.ts`** — the seeded arena, checked against the real game rules rather than eyeballed. It has already caught one Kwami tagged `live` whose numbers put it below the death threshold.
+
+**`wallet-connect.test.ts`** — what "Connect Phantom" does when it cannot. The install page on desktop, the universal link on a phone, a locked wallet explained rather than swallowed, and the two cases that were shipped broken: a stale `unavailable` verdict outranking a provider that injected late, and a dismissed sign-in leaving every button on the page stuck on _Connecting…_. The store is the subject rather than the buttons, because that is where the decision moved — see [Connecting](/docs/auth#connecting).
+
+It stubs the three Nuxt auto-imports the store uses and mocks `Connection`, so no test touches an RPC. That is the whole harness; a component mount would only assert that a button rendered.
 
 ## Writing tests here
 
