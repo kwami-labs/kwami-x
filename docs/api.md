@@ -137,9 +137,13 @@ Bills the room for the seconds it has held open since the last tick. Takes no du
 
 `starved: true` is a 200, not a 402. The challenger paid for this window and keeps it — the client drops the room and finishes on the browser path.
 
-### `GET /api/internal/voice/:id` — agent key only
+### `GET /api/internal/kwamis/:id/runtime` — agent key only
 
-Everything the voice worker needs to speak as this Kwami: persona, voice, game, guard strength, traits **and the phrase it is guarding**. The only route that returns a secret outside a verified win, and the reason it can is that it is server-to-server — authenticated by `X-Kwami-Agent-Key` against `NUXT_AGENT_API_KEY`, never by a user's session. Unset key is a 503; wrong key is a 401; a session that is over is a 409.
+Everything the voice worker needs to speak as this Kwami: persona, voice, game, guard strength, traits **and the phrase it is guarding**, already compiled into the `config` message `kwami-lk-agent` parses. The only route that returns a secret outside a verified win, and the reason it can is that it is server-to-server — authenticated by `X-Kwami-API-Key` against `NUXT_AGENT_API_KEY`, never by a user's session. Unset key is a 503; wrong key is a 401; a session that is over is a 409.
+
+`:id` is a **session** id, not a Kwami id. The path is the worker's URL template rather than ours — it builds `{KWAMI_RUNTIME_API_URL}/internal/kwamis/{id}/runtime` — and a session is the right key anyway: it is what expires, what was paid for, and what decides whether the phrase may still be handed out.
+
+The studio never calls this. A draft has no row to look up, so it publishes the same message over the room's data channel, which is safe only because the creator is the sole participant.
 
 ### `POST /api/session/:id/claimed` — auth, player only
 

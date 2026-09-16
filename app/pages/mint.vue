@@ -928,7 +928,7 @@ async function onSubmit() {
             <p class="muted">
               Connect Phantom to mint. The transaction creates the NFT and its vault in one go.
             </p>
-            <button class="btn btn--primary" @click="wallet.connect()">Connect Phantom</button>
+            <ConnectWallet />
           </div>
           <div v-else class="stack gap-2">
             <div class="costs">

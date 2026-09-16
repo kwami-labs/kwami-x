@@ -165,10 +165,9 @@ async function guard(run: () => Promise<void>, action?: string) {
 
 const onPhantom = () =>
   guard(async () => {
-    if (wallet.status === 'unavailable' && mobile) {
-      window.location.href = phantomDeeplink()
-      return
-    }
+    // `wallet.signIn` reopens this page inside Phantom on a phone and opens the
+    // install page on desktop, off a live provider read rather than the
+    // mount-time verdict, which goes stale when Phantom injects late.
     await auth.signInWithPhantom()
     settled()
   }, 'phantom')

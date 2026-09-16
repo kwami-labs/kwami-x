@@ -2,6 +2,7 @@ import { serviceClient } from '~~/server/utils/supabase'
 import { loadSecret } from '~~/server/utils/kwami-secret'
 import { assertNotDemo } from '~~/server/utils/demo'
 import { readVoiceConfig } from '#shared/kwami/voice'
+import { agentConfigMessage } from '#shared/kwami/agent-config'
 
 /**
  * What the voice worker needs in order to speak as a Kwami.
@@ -9,6 +10,18 @@ import { readVoiceConfig } from '#shared/kwami/voice'
  * The agent is dispatched with a session id and nothing else, because
  * everything else is either private or too long to put in a JWT the player
  * holds. This is where it trades that id for the real configuration.
+ *
+ * The path says `kwamis/:id` and the id is a *session* id. That is the worker's
+ * URL template, not ours — `kwami-lk-agent` builds
+ * `{KWAMI_RUNTIME_API_URL}/internal/kwamis/{id}/runtime` and cannot be told
+ * otherwise without a release, so this route answers where it actually knocks.
+ * A session is the right key regardless: it is what expires, what was paid for,
+ * and what decides whether the phrase may still be handed out at all.
+ *
+ * The studio does not come here. A draft has no row to look up, so it publishes
+ * its configuration over the room's data channel instead — safe there because
+ * the only participant is the creator, who typed the phrase. In a real session
+ * room the player is present, so the phrase must never travel that way.
  *
  * **This route returns a Kwami's secret**, and it is the only one that does so
  * outside a verified win. That is not an oversight: the brain needs the phrase
@@ -33,7 +46,9 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'The voice agent callback is not configured. Set NUXT_AGENT_API_KEY.',
     })
   }
-  if (getHeader(event, 'x-kwami-agent-key') !== expected) {
+  // `X-Kwami-API-Key` is the header the worker sends, and header names are
+  // case-insensitive — `getHeader` lowercases before matching.
+  if (getHeader(event, 'x-kwami-api-key') !== expected) {
     throw createError({ statusCode: 401, statusMessage: 'Bad agent key.' })
   }
 
@@ -62,7 +77,11 @@ export default defineEventHandler(async (event) => {
   const voice = readVoiceConfig(kwami?.voice as Record<string, unknown> | null)
   const { secret } = await loadSecret(session.kwami_id)
 
-  return {
+  // The same builder the studio publishes over the data channel, so a Kwami
+  // rehearsed before minting and one played afterwards are configured by one
+  // piece of code rather than two that drift.
+  return agentConfigMessage({
+    kwamiId: session.kwami_id,
     name: kwami?.name ?? '',
     persona: kwami?.persona ?? '',
     secret,
@@ -72,5 +91,5 @@ export default defineEventHandler(async (event) => {
     guardStrength: voice.guardStrength,
     traits: voice.traits,
     secondsLeft: Math.max(0, (new Date(session.expires_at).getTime() - Date.now()) / 1000),
-  }
+  })
 })

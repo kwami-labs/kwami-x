@@ -2,7 +2,9 @@ import { defineStore } from 'pinia'
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
 import type { Transaction, VersionedTransaction } from '@solana/web3.js'
 import {
+  PHANTOM_INSTALL_URL,
   describeWalletError,
+  getPhantomProvider,
   isMobileBrowser,
   isUserRejection,
   normalizeSignInOutput,
@@ -82,6 +84,61 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   /**
+   * There is no Phantom here — offer the way to get one.
+   *
+   * Every caller used to be left with `status: 'unavailable'` and an error
+   * string that only the header button rendered, so "Connect Phantom" on the
+   * mint, play, top-up and account pages was a button that did nothing at all
+   * when pressed. The way out belongs next to the dead end, not in one
+   * component that happened to remember it.
+   */
+  function offerPhantom() {
+    if (isMobileBrowser()) {
+      // The extension cannot exist in a phone browser; the universal link
+      // reopens this page inside Phantom's, where the provider is injected.
+      // Navigating away is not guaranteed — the link can be blocked, and the
+      // user can come back with the page still alive — so do not leave the
+      // button stuck on "Connecting…".
+      status.value = 'disconnected'
+      window.location.href = phantomDeeplink()
+      return
+    }
+    status.value = 'unavailable'
+    error.value = 'Phantom is not installed. We opened its download page in a new tab.'
+    window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener')
+  }
+
+  /**
+   * The provider, or null with the escape hatch already offered.
+   *
+   * Stays synchronous whenever the answer is already known, because opening
+   * the install page needs the click's own user gesture and an `await` first
+   * spends it. `unavailable` is the verdict mount-time `autoConnect` reached
+   * after waiting out a late injection, so when it holds there is nothing left
+   * to wait for; the re-read covers a provider that landed since.
+   */
+  async function requireProvider(): Promise<PhantomProvider | null> {
+    let p = provider ?? getPhantomProvider()
+    if (!p && status.value !== 'unavailable') {
+      // Show the wait — it can run the full three seconds, and a button that
+      // looks inert for three seconds gets pressed again.
+      status.value = 'connecting'
+      p = await waitForPhantom()
+      // Borrowed, not owned: `connect` sets it again on the next line, and
+      // `signIn` can throw without ever reaching a status of its own — which
+      // would leave every button on the page stuck on "Connecting…".
+      if (p) status.value = 'disconnected'
+    }
+    if (!p) {
+      offerPhantom()
+      return null
+    }
+    provider = p
+    bindProviderEvents(p)
+    return p
+  }
+
+  /**
    * Reconnect without a prompt when the user has already authorised this site.
    *
    * Called on app mount. `onlyIfTrusted` throws when there is no prior grant,
@@ -91,6 +148,11 @@ export const useWalletStore = defineStore('wallet', () => {
     const p = await waitForPhantom()
     if (!p) {
       status.value = 'unavailable'
+      // Phantom can still land after the wait gives up. Without this the
+      // verdict is permanent, and every hint keyed off `unavailable` — the
+      // "Get Phantom" label, the sign-in modal's "no Phantom detected" — goes
+      // on lying to somebody who has it installed.
+      window.addEventListener('phantom#initialized', () => void autoConnect(), { once: true })
       return
     }
     provider = p
@@ -111,27 +173,10 @@ export const useWalletStore = defineStore('wallet', () => {
 
   async function connect() {
     error.value = null
+    const p = await requireProvider()
+    if (!p) return
+
     status.value = 'connecting'
-
-    const p = provider ?? (await waitForPhantom())
-    if (!p) {
-      // On a phone the extension can never exist; the universal link reopens
-      // this page inside Phantom's browser, where it does.
-      if (isMobileBrowser()) {
-        // Navigating away is not guaranteed — the link can be blocked, and the
-        // user can come back with the page still alive. Leaving the button
-        // disabled on "Connecting…" forever is the worse of the two outcomes.
-        status.value = 'disconnected'
-        window.location.href = phantomDeeplink()
-        return
-      }
-      status.value = 'unavailable'
-      error.value = 'Phantom is not installed.'
-      return
-    }
-
-    provider = p
-    bindProviderEvents(p)
     try {
       const { publicKey: key } = await p.connect()
       address.value = key.toBase58()
@@ -165,18 +210,11 @@ export const useWalletStore = defineStore('wallet', () => {
    * dapp supplies it, and our parser rejects messages that omit them.
    */
   async function signIn(nonce: string): Promise<{ message: string; signature: Uint8Array; address: string }> {
-    const p = provider ?? (await waitForPhantom())
-    if (!p) {
-      // Same mobile escape hatch as `connect`: the extension cannot exist in a
-      // phone browser, so reopen this page inside Phantom's in-app browser.
-      if (isMobileBrowser()) {
-        window.location.href = phantomDeeplink()
-        throw new Error('Opening Phantom…')
-      }
-      throw new Error('Phantom is not installed.')
-    }
-    provider = p
-    bindProviderEvents(p)
+    // Same escape hatch as `connect` — `requireProvider` has already sent the
+    // user to the install page or reopened this page inside Phantom — but this
+    // one has to throw, because callers await a signature.
+    const p = await requireProvider()
+    if (!p) throw new Error(isMobileBrowser() ? 'Opening Phantom…' : 'Phantom is not installed.')
 
     const cluster = config.public.solanaCluster as Cluster
     const chainId = SOLANA_CHAIN_IDS[cluster]

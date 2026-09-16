@@ -44,7 +44,7 @@ export default defineNuxtConfig({
     livekitAgentName: 'kwami-agent',
     /**
      * Shared key the voice worker presents to read a session's persona and
-     * secret. Server-to-server only — see `server/api/internal/voice/[id].get.ts`.
+     * secret. Server-to-server only — see `server/api/internal/kwamis/[id]/runtime.get.ts`.
      */
     agentApiKey: '',
     openaiApiKey: '',

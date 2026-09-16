@@ -79,7 +79,16 @@ describe('createLiveKitToken', () => {
     const { payload } = decode(
       createLiveKitToken({ room: 'r', identity: 'i', agentName: 'kwami-agent', agentMetadata: 'sess-1' }),
     )
-    expect(payload.roomConfig).toEqual({ agents: [{ agentName: 'kwami-agent', metadata: 'sess-1' }] })
+    expect(payload.roomConfig.agents).toEqual([{ agentName: 'kwami-agent', metadata: 'sess-1' }])
+  })
+
+  // The agents claim is honoured when the room is created and ignored when it
+  // already exists, so a room that outlives its session is one the next
+  // connection joins with nothing in it. These timeouts are what stop that.
+  it('asks for the room to be torn down promptly once it empties', () => {
+    const { payload } = decode(createLiveKitToken({ room: 'r', identity: 'i', agentName: 'kwami-agent' }))
+    expect(payload.roomConfig.departureTimeout).toBeLessThanOrEqual(30)
+    expect(payload.roomConfig.emptyTimeout).toBeLessThan(300)
   })
 
   // A deployment with keys but no worker running must not ask for one: a room
