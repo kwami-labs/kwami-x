@@ -32,8 +32,10 @@ import {
   Color,
   Mesh,
   PerspectiveCamera,
+  Raycaster,
   Scene,
   ShaderMaterial,
+  Sphere,
   WebGLRenderer,
   AdditiveBlending,
   BufferGeometry,
@@ -41,7 +43,9 @@ import {
   Points,
   PointsMaterial,
   SphereGeometry,
+  Vector2,
   Vector3,
+  Vector4,
 } from 'three'
 import type { KwamiRenderer, KwamiSkin } from '#shared/types/kwami'
 import type { KwamiTuning } from '#shared/kwami/appearance'
@@ -208,6 +212,112 @@ float snoise(vec3 v) {
 }
 `
 
+/* ────────────────────────────────────────────────────────────────────────────
+   Touch
+
+   Pressing a Kwami dents it. Lifted wholesale from the `kwami` library's
+   `blob-xyz` renderer — the same constants, the same easing, the same sink and
+   ripple — so that pressing the thing on the mint stage feels like pressing the
+   one on the waitlist page, which is where anyone meeting a Kwami meets it
+   first. The only change is where the arithmetic runs: the library walks every
+   vertex on the CPU each frame, and this build displaces on the GPU, so the
+   touches arrive as uniforms and the loop lives in the vertex shader.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** How many presses can be settling at once. Older ones are dropped. */
+export const TOUCH_POINTS = 5
+/** How deep one press digs, before falloff. */
+export const TOUCH_STRENGTH = 1
+/** How long a press takes to arrive and fade, in milliseconds. */
+export const TOUCH_DURATION_MS = 1100
+/**
+ * How far a press reaches, in radii.
+ *
+ * Wider than the Kwami: a press has *some* effect everywhere, and the cubic
+ * falloff below is what keeps it read as a dent under the finger rather than as
+ * the whole body shrinking.
+ */
+export const TOUCH_RADIUS = 2.1
+
+/**
+ * How much of the way the surface travels toward the press each frame.
+ *
+ * The library's idle figure, and the single thing that makes a press feel like
+ * pressing something rather than like watching an animation of a press. It
+ * walks every vertex toward its target at a quarter of the remaining distance
+ * per frame, so the dent arrives a little behind the finger and — the half that
+ * actually reads — keeps coming back after the press itself is over. Without
+ * it, the ease curve is the whole motion and the surface snaps to it.
+ */
+export const TOUCH_SMOOTHING = 0.25
+
+/**
+ * That quarter-per-frame, as a proportion of the gap to close in `dt` seconds.
+ *
+ * The library assumes 60fps and applies a flat 0.25. Taken literally on a
+ * 144Hz display that is a surface arriving two and a half times faster than
+ * designed, and on a struggling tab a surface that never gets there; this is
+ * the same curve in wall-clock time, whatever the frame rate.
+ */
+export function touchSettle(dt: number): number {
+  if (!Number.isFinite(dt) || dt <= 0) return 0
+  return 1 - Math.pow(1 - TOUCH_SMOOTHING, dt * 60)
+}
+
+/**
+ * How far into a press we are, in [0, 1].
+ *
+ * Quadratic in and cubic out, meeting at a quarter of the way through: the dent
+ * arrives in about a quarter of a second and takes the rest of the second to
+ * come back. Even easing both ways reads as a pulse animation playing; this
+ * reads as something soft being pushed and letting go.
+ */
+export function touchEase(progress: number): number {
+  if (!Number.isFinite(progress) || progress <= 0 || progress >= 1) return 0
+  if (progress < 0.25) {
+    const t = progress / 0.25
+    return t * t
+  }
+  const t = (progress - 0.25) / 0.75
+  return 1 - t * t * t
+}
+
+/**
+ * The press, in the vertex shader.
+ *
+ * `w` carries the ease and `uTouchDrive` the progress and the strength, because
+ * the ripple rides on the ease but not on the strength — the library's own
+ * split, and the reason a hard press digs deeper without also ringing louder.
+ *
+ * Branch-free on purpose: a spent slot is a zero ease, which multiplies the
+ * whole term away. Skipping it with `continue` would be marginally cheaper on
+ * paper and is the kind of dynamic control flow that some drivers unroll into
+ * something slower than the arithmetic it replaced.
+ */
+const TOUCH_GLSL = `
+#define KWAMI_TOUCHES ${TOUCH_POINTS}
+const float KWAMI_TOUCH_RADIUS = ${TOUCH_RADIUS.toFixed(4)};
+
+uniform vec4 uTouch[KWAMI_TOUCHES];
+uniform vec2 uTouchDrive[KWAMI_TOUCHES];
+
+float touchAt(vec3 dir) {
+  float total = 0.0;
+  for (int i = 0; i < KWAMI_TOUCHES; i++) {
+    float dist = distance(dir, uTouch[i].xyz);
+    float influence = max(0.0, 1.0 - dist / KWAMI_TOUCH_RADIUS);
+    // Cubic-ish falloff. Linear spreads one press over the whole body, which
+    // is a Kwami deflating rather than a Kwami being poked.
+    float reach = pow(influence, 3.2) * uTouch[i].w;
+    float sink = -uTouchDrive[i].y * 0.42 * reach;
+    // A ring travelling out from the press, on the same clock as the ease.
+    float wave = sin(dist * 2.4 - uTouchDrive[i].x * 5.4) * 0.24 * reach;
+    total += sink + wave;
+  }
+  return clamp(total, -0.7, 0.5);
+}
+`
+
 export const KWAMI_VERTEX_SHADER = `
 uniform float uTime;
 uniform float uAmplitude;
@@ -226,6 +336,7 @@ varying vec3 vPos;
 varying float vDisplace;
 
 ${SIMPLEX}
+${TOUCH_GLSL}
 
 /**
  * How far the surface is pushed out along a given direction on the sphere.
@@ -261,7 +372,13 @@ float displaceAt(vec3 dir, float life) {
   float spike = snoise(dir * freq * boost * 1.7 + clock * 1.8);
 
   float d = uAmplitude * ampMul * (idle + spike * uAudio * 1.5) * life;
-  return d + uBreathing * sin(uTime * 1.6) + uAudio * 0.14 + uArousal * 0.06;
+  float shaped =
+    d + uBreathing * sin(uTime * 1.6) + uAudio * 0.14 + uArousal * 0.06 + touchAt(dir);
+
+  // The same floor and ceiling the library applies to its own vertices. A dent
+  // deep enough to reach the middle of the Kwami is a hole rather than a
+  // squish, and the surface folds through itself on the way.
+  return clamp(1.0 + shaped, 0.55, 1.45) - 1.0;
 }
 
 void main() {
@@ -465,6 +582,10 @@ export function createKwamiUniforms(
     uColorA: { value: new Color(colors.a) },
     uColorB: { value: new Color(colors.b) },
     uColorC: { value: new Color(colors.c) },
+    // Fixed-length, because a GLSL array is. An unused slot carries a zero ease
+    // and multiplies itself out of the sum.
+    uTouch: { value: Array.from({ length: TOUCH_POINTS }, () => new Vector4()) },
+    uTouchDrive: { value: Array.from({ length: TOUCH_POINTS }, () => new Vector2()) },
   }
 }
 
@@ -527,6 +648,80 @@ export function cameraDistanceFor(fovDegrees: number, aspect: number, radius = K
   return Math.max(radius / half, radius / (half * aspect))
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+   Handling a Kwami
+
+   Three gestures, and one shared reason for existing: a creator who can turn
+   the thing they are building, look at the back of it, and push it in with a
+   finger stops reading the stage as a picture of a Kwami and starts reading it
+   as the Kwami. Everything below is the arithmetic behind that, kept out of the
+   render loop so it can be tested without a GPU.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * How far the wheel can dolly the camera, as a multiple of the framing distance.
+ *
+ * Bounded at both ends rather than free: past about 2x the near surface fills
+ * the canvas and the silhouette — the thing the creator is actually choosing —
+ * is off screen entirely, and past about 0.5x the Kwami is a bead in the middle
+ * of an empty panel. Neither is a view anyone chose on purpose, and both are
+ * easy to land on with one flick of a trackpad.
+ */
+export const ZOOM_LIMITS = { min: 0.55, max: 2 } as const
+
+export function clampZoom(zoom: number): number {
+  if (!Number.isFinite(zoom)) return 1
+  return Math.min(ZOOM_LIMITS.max, Math.max(ZOOM_LIMITS.min, zoom))
+}
+
+/** A wheel notch in lines, and a page, in pixels. Matching Chrome's own numbers. */
+const WHEEL_LINE_PX = 16
+const WHEEL_PAGE_PX = 400
+
+/**
+ * The zoom a wheel event leaves behind.
+ *
+ * Multiplicative, so a notch means the same *proportion* whether the Kwami is
+ * pulled right out or pushed right in — an additive step is coarse at the far
+ * end and glacial at the near one. `deltaMode` is honoured because a mouse
+ * wheel on Firefox reports lines and a trackpad reports pixels, and treating
+ * three lines as three pixels makes a real wheel feel broken.
+ */
+export function zoomAfterWheel(zoom: number, deltaY: number, deltaMode = 0): number {
+  if (!Number.isFinite(deltaY)) return clampZoom(zoom)
+  const scale = deltaMode === 1 ? WHEEL_LINE_PX : deltaMode === 2 ? WHEEL_PAGE_PX : 1
+  // Clamped before it is applied: a single trackpad flick can report several
+  // hundred pixels, and one event that jumps the whole range reads as a bug.
+  const px = Math.max(-120, Math.min(120, deltaY * scale))
+  return clampZoom(zoom * Math.exp(-px * 0.0022))
+}
+
+/**
+ * How far a drag can tip the Kwami, in radians.
+ *
+ * Just under a right angle. Letting it go over the top means a creator can
+ * leave the stage looking at the underside of their Kwami with no obvious way
+ * back, and there is nothing on the far side of the pole worth the trip.
+ */
+export const PITCH_LIMIT = 0.85
+
+/** Radians of yaw for a drag across the full width of the canvas. */
+export const YAW_PER_WIDTH = Math.PI * 1.6
+/** Radians of pitch for a drag down the full height. */
+export const PITCH_PER_HEIGHT = Math.PI * 0.8
+
+/**
+ * How much of the last drag frame carries on after the finger leaves.
+ *
+ * A flick that stops dead the instant contact ends reads as the Kwami being
+ * bolted down. This is per-second velocity from a per-event delta, which is
+ * why it looks large: it is roughly one frame's worth of movement sustained
+ * for a fifth of a second.
+ */
+export const FLICK_GAIN = 14
+/** How fast a coast bleeds off, per second. */
+export const FLICK_DECAY = 3.4
+
 export interface KwamiRendererOptions {
   renderer?: KwamiRenderer
   skin?: KwamiSkin
@@ -575,6 +770,24 @@ export interface KwamiRendererHandle {
   /** Apply creator overrides on top of the current body's preset. */
   setTuning(tuning: Partial<RendererParams>): void
   setActivity(activity: KwamiActivity): void
+  /**
+   * Press the Kwami in at a point in [-1, 1] canvas coordinates, +y up.
+   *
+   * Omit the point — or miss the body with it — and the press comes from the
+   * centre instead, which dips the whole Kwami at once.
+   */
+  squish(at?: { x: number; y: number } | null): void
+  /**
+   * Dolly on a wheel event. Returns false when the zoom was already against the
+   * stop, so the caller can let the page scroll instead of swallowing the event.
+   */
+  zoomByWheel(deltaY: number, deltaMode?: number): boolean
+  /** Turn the Kwami. Deltas are fractions of the canvas, not pixels. */
+  spinBy(dx: number, dy: number): void
+  /** Let go mid-drag, so it coasts to a stop instead of stopping dead. */
+  spinFlick(dx: number, dy: number): void
+  /** Back to the framing and the tilt it mounted with. */
+  resetView(): void
   resize(): void
   dispose(): void
 }
@@ -790,6 +1003,56 @@ export function mountKwami(
   const clockStart = performance.now()
   let lastFrame = clockStart
 
+  // ── What the viewer is doing to it ────────────────────────────────────────
+  /** Where the camera is asked to sit, and where it actually is. */
+  let zoomTarget = 1
+  let zoomLive = 1
+  /** The framing distance for the current aspect, before zoom. */
+  let baseDistance = camera.position.z
+  /** Yaw the drift adds on its own, and yaw the viewer has dragged in. */
+  let driftYaw = 0
+  let dragYaw = 0
+  let pitchTarget = 0
+  let pitchLive = 0
+  /** Coast after a flick, in radians per second. */
+  let yawMomentum = 0
+  let pitchMomentum = 0
+  /**
+   * Presses still settling, oldest first. Never longer than `TOUCH_POINTS`.
+   *
+   * `ease` is the *smoothed* depth, not the curve's value: the surface lags the
+   * press, which is why a touch outlives its own duration and is retired on
+   * having come back rather than on the clock.
+   */
+  const touches: Array<{ point: Vector3; startedAt: number; ease: number }> = []
+
+  // Reused rather than rebuilt on every click.
+  const raycaster = new Raycaster()
+  const ndc = new Vector2()
+  const unitSphere = new Sphere(new Vector3(0, 0, 0), 1)
+  const hit = new Vector3()
+
+  /**
+   * Where a click on the canvas lands on the Kwami, in its own space.
+   *
+   * Against an analytic unit sphere rather than the mesh, which is the same
+   * surface before displacement and costs a quadratic instead of thirty-seven
+   * thousand triangle tests. Object space rather than world, because the shader
+   * knows each vertex by its direction on the undisplaced sphere and the mesh
+   * is turning the whole time.
+   *
+   * A click that misses the body presses from the centre, which is the pulse
+   * the library gives a page-wide click: every direction is equidistant, so the
+   * whole Kwami dips at once instead of the click doing nothing at all.
+   */
+  function touchPointFor(at?: { x: number; y: number } | null): Vector3 {
+    if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return new Vector3()
+    ndc.set(at.x, at.y)
+    raycaster.setFromCamera(ndc, camera)
+    if (!raycaster.ray.intersectSphere(unitSphere, hit)) return new Vector3()
+    return mesh.worldToLocal(hit.clone())
+  }
+
   /**
    * The movement the Kwami generates on its own, on top of what the game asks for.
    *
@@ -818,7 +1081,8 @@ export function mountKwami(
     if (w === 0 || h === 0) return
     renderer.setSize(w, h, false)
     camera.aspect = w / h
-    camera.position.z = cameraDistanceFor(camera.fov, camera.aspect)
+    baseDistance = cameraDistanceFor(camera.fov, camera.aspect)
+    camera.position.z = baseDistance / zoomLive
     camera.updateProjectionMatrix()
   }
 
@@ -854,9 +1118,56 @@ export function mountKwami(
     uniforms.uAmp.value.set(live.ampX, live.ampY, live.ampZ)
     uniforms.uTimeScale.value.set(live.timeX, live.timeY, live.timeZ)
 
-    mesh.rotation.y += dt * live.spin
-    mesh.rotation.x = Math.sin(elapsed / 6000) * 0.14
+    // The Kwami's own drift, plus whatever the viewer has dragged in and
+    // whatever is left of their last flick. Kept as separate terms so a drag
+    // never fights the spin the creator tuned — it rides on top of it.
+    driftYaw += dt * live.spin
+    dragYaw += yawMomentum * dt
+    pitchTarget = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchTarget + pitchMomentum * dt))
+    const coast = Math.exp(-dt * FLICK_DECAY)
+    yawMomentum *= coast
+    pitchMomentum *= coast
+
+    // Pitch and zoom are eased rather than applied raw: a wheel arrives in
+    // coarse notches and a trackpad in a burst of them, and following either
+    // exactly is a camera that jerks.
+    const settle = Math.min(1, dt * 12)
+    pitchLive += (pitchTarget - pitchLive) * settle
+    zoomLive += (zoomTarget - zoomLive) * settle
+    camera.position.z = baseDistance / zoomLive
+
+    mesh.rotation.y = driftYaw + dragYaw
+    mesh.rotation.x = Math.sin(elapsed / 6000) * 0.14 + pitchLive
     if (sparks) sparks.rotation.y -= dt * live.spin * 0.4
+
+    // Ease each live press toward the curve, then retire the ones that have
+    // finished coming back. Walked from the back so a removal cannot skip the
+    // next one.
+    const settling = touchSettle(dt)
+    for (let i = touches.length - 1; i >= 0; i--) {
+      const touch = touches[i]!
+      const progress = (now - touch.startedAt) / TOUCH_DURATION_MS
+      touch.ease += (touchEase(progress) - touch.ease) * settling
+      // On the surface having come back, not on the clock: the lag outlives the
+      // press, and cutting it at the duration puts a step at the end of every
+      // single touch.
+      if (progress >= 1 && touch.ease < 0.002) touches.splice(i, 1)
+    }
+    for (let i = 0; i < TOUCH_POINTS; i++) {
+      const touch = touches[i]
+      const slot = uniforms.uTouch.value[i]!
+      const drive = uniforms.uTouchDrive.value[i]!
+      if (!touch) {
+        slot.set(0, 0, 0, 0)
+        drive.set(0, 0)
+        continue
+      }
+      slot.set(touch.point.x, touch.point.y, touch.point.z, touch.ease)
+      // Frozen at the end of the press, so the ripple fades where it finished
+      // rather than carrying on travelling through a Kwami nobody is touching.
+      const phase = Math.min(1, (now - touch.startedAt) / TOUCH_DURATION_MS)
+      drive.set(phase, TOUCH_STRENGTH)
+    }
 
     renderer.render(scene, camera)
     raf = requestAnimationFrame(frame)
@@ -904,6 +1215,36 @@ export function mountKwami(
     },
     setActivity(next) {
       activity = next
+    },
+    squish(at) {
+      // A fixed number of slots, oldest evicted. Mashing the Kwami should
+      // overlap a handful of dents, not queue up a minute of them.
+      if (touches.length >= TOUCH_POINTS) touches.shift()
+      touches.push({ point: touchPointFor(at), startedAt: performance.now(), ease: 0 })
+    },
+    zoomByWheel(deltaY, deltaMode = 0) {
+      const next = zoomAfterWheel(zoomTarget, deltaY, deltaMode)
+      if (next === zoomTarget) return false
+      zoomTarget = next
+      return true
+    },
+    spinBy(dx, dy) {
+      // A new drag kills the old coast; otherwise the Kwami keeps drifting out
+      // from under the finger that is trying to hold it still.
+      yawMomentum = 0
+      pitchMomentum = 0
+      dragYaw += dx * YAW_PER_WIDTH
+      pitchTarget = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitchTarget + dy * PITCH_PER_HEIGHT))
+    },
+    spinFlick(dx, dy) {
+      yawMomentum = dx * YAW_PER_WIDTH * FLICK_GAIN
+      pitchMomentum = dy * PITCH_PER_HEIGHT * FLICK_GAIN
+    },
+    resetView() {
+      zoomTarget = 1
+      pitchTarget = 0
+      yawMomentum = 0
+      pitchMomentum = 0
     },
     resize,
     dispose() {

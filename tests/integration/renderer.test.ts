@@ -2,11 +2,21 @@ import { describe, expect, it } from 'vitest'
 import {
   KWAMI_FRAME_RADIUS,
   KWAMI_VERTEX_SHADER,
+  PITCH_LIMIT,
   RENDERER_PRESETS,
+  TOUCH_DURATION_MS,
+  TOUCH_POINTS,
+  TOUCH_RADIUS,
+  TOUCH_SMOOTHING,
+  ZOOM_LIMITS,
   buildKwamiFragmentShader,
   cameraDistanceFor,
+  clampZoom,
   resolveRendererParams,
   segmentsForResolution,
+  touchEase,
+  touchSettle,
+  zoomAfterWheel,
 } from '~/utils/kwami-renderer'
 import { KWAMI_SKINS, tuningForSkin } from '#shared/kwami/skins'
 import { lookFor } from '~/utils/format'
@@ -348,5 +358,220 @@ describe('segmentsForResolution', () => {
     for (const resolution of [120, 137, 180, 199, 220]) {
       expect(segmentsForResolution(resolution).width % 2, String(resolution)).toBe(0)
     }
+  })
+})
+
+describe('zoomAfterWheel', () => {
+  it('pushes in on a scroll up and pulls out on a scroll down', () => {
+    expect(zoomAfterWheel(1, -100)).toBeGreaterThan(1)
+    expect(zoomAfterWheel(1, 100)).toBeLessThan(1)
+  })
+
+  it('stops at both ends rather than running away', () => {
+    // Past the far stop the Kwami is a bead in an empty panel and past the near
+    // one the silhouette — the thing being chosen — is off screen entirely.
+    let out = 1
+    let inward = 1
+    for (let i = 0; i < 200; i++) {
+      out = zoomAfterWheel(out, 400)
+      inward = zoomAfterWheel(inward, -400)
+    }
+    expect(out).toBe(ZOOM_LIMITS.min)
+    expect(inward).toBe(ZOOM_LIMITS.max)
+  })
+
+  it('reports the stop by not moving, so the page can have the scroll back', () => {
+    // What stops a reader being trapped on the stage: the component only
+    // swallows the wheel event while the zoom still has somewhere to go.
+    expect(zoomAfterWheel(ZOOM_LIMITS.max, -100)).toBe(ZOOM_LIMITS.max)
+    expect(zoomAfterWheel(ZOOM_LIMITS.min, 100)).toBe(ZOOM_LIMITS.min)
+  })
+
+  it('reads a line-mode wheel as further than a pixel-mode one', () => {
+    // Firefox reports three *lines* where Chrome reports a hundred pixels.
+    // Treating them as the same number makes a real mouse wheel feel dead.
+    expect(zoomAfterWheel(1, 3, 1)).toBeLessThan(zoomAfterWheel(1, 3, 0))
+    expect(zoomAfterWheel(1, 1, 2)).toBeLessThan(zoomAfterWheel(1, 1, 1))
+  })
+
+  it('caps one event, so a trackpad burst cannot cross the whole range', () => {
+    // A single inertial flick can report several hundred pixels; one event that
+    // jumped from one stop to the other would read as a bug rather than a zoom.
+    expect(zoomAfterWheel(1, 20_000)).toBeGreaterThan(ZOOM_LIMITS.min)
+    expect(zoomAfterWheel(1, -20_000)).toBeLessThan(ZOOM_LIMITS.max)
+  })
+
+  it('means the same proportion wherever it is applied', () => {
+    // Multiplicative rather than additive: an additive step is a crawl when the
+    // camera is far out and a lurch when it is close in.
+    const near = zoomAfterWheel(0.8, -40) / 0.8
+    const far = zoomAfterWheel(1.6, -40) / 1.6
+    expect(near).toBeCloseTo(far, 10)
+  })
+
+  it('survives the junk a wheel event can actually carry', () => {
+    // A non-finite zoom is a broken camera, and the only safe recovery is the
+    // framing the stage mounted with — clamping infinity to the near stop would
+    // leave the creator inside their own Kwami with no idea why.
+    expect(zoomAfterWheel(1, Number.NaN)).toBe(1)
+    expect(clampZoom(Number.NaN)).toBe(1)
+    expect(clampZoom(Number.POSITIVE_INFINITY)).toBe(1)
+    expect(clampZoom(3)).toBe(ZOOM_LIMITS.max)
+    expect(clampZoom(0.01)).toBe(ZOOM_LIMITS.min)
+  })
+})
+
+describe('touchEase', () => {
+  it('does nothing before the press and nothing after it', () => {
+    expect(touchEase(0)).toBe(0)
+    expect(touchEase(1)).toBe(0)
+    expect(touchEase(1.4)).toBe(0)
+    expect(touchEase(-0.2)).toBe(0)
+    expect(touchEase(Number.NaN)).toBe(0)
+  })
+
+  it('lands the dent a quarter of the way in and takes the rest to let go', () => {
+    // The asymmetry is the whole feel of it: a press that eases in and out
+    // evenly reads as an animation playing rather than as something soft being
+    // pushed. Quarter in, three quarters out.
+    expect(touchEase(0.25)).toBeCloseTo(1, 12)
+    expect(touchEase(0.125)).toBeCloseTo(0.25, 12)
+    expect(touchEase(0.625)).toBeCloseTo(0.875, 12)
+  })
+
+  it('joins up where the two halves meet', () => {
+    // Both branches are 1 at a quarter. A step here is a visible jolt at the
+    // deepest point of every single press.
+    expect(touchEase(0.24999)).toBeCloseTo(touchEase(0.25001), 3)
+  })
+
+  it('rises to the dent and then falls away, without ever going backwards', () => {
+    const rising = [0.05, 0.1, 0.15, 0.2, 0.25].map(touchEase)
+    expect(rising).toEqual([...rising].sort((a, b) => a - b))
+    const falling = [0.3, 0.5, 0.7, 0.9, 0.99].map(touchEase)
+    expect(falling).toEqual([...falling].sort((a, b) => b - a))
+  })
+
+  it('is never deeper than the press that caused it', () => {
+    for (let p = 0; p <= 1; p += 0.01) {
+      expect(touchEase(p), String(p)).toBeGreaterThanOrEqual(0)
+      expect(touchEase(p), String(p)).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('the touch in the vertex shader', () => {
+  it('dents the surface where it was pressed and rings out from there', () => {
+    // The library does this per vertex on the CPU; this build displaces on the
+    // GPU, so the same arithmetic has to be in the shader or a press does
+    // nothing at all. These are the terms it is made of.
+    expect(KWAMI_VERTEX_SHADER).toContain('float touchAt(vec3 dir)')
+    expect(KWAMI_VERTEX_SHADER).toContain('uniform vec4 uTouch[KWAMI_TOUCHES]')
+    expect(KWAMI_VERTEX_SHADER).toContain('uniform vec2 uTouchDrive[KWAMI_TOUCHES]')
+    // The sink, and the ripple travelling out behind it.
+    expect(KWAMI_VERTEX_SHADER).toContain('-uTouchDrive[i].y * 0.42 * reach')
+    expect(KWAMI_VERTEX_SHADER).toContain('sin(dist * 2.4 - uTouchDrive[i].x * 5.4) * 0.24 * reach')
+  })
+
+  it('carries the constants the renderer schedules the press with', () => {
+    // Two copies of 2.1 — one in TypeScript deciding how far a press reaches
+    // and one in GLSL applying it — is a drift waiting to happen, so the shader
+    // is written from the constant.
+    expect(KWAMI_VERTEX_SHADER).toContain(`#define KWAMI_TOUCHES ${TOUCH_POINTS}`)
+    expect(KWAMI_VERTEX_SHADER).toContain(`const float KWAMI_TOUCH_RADIUS = ${TOUCH_RADIUS.toFixed(4)};`)
+    // GLSL has no implicit int-to-float, so a radius that ever became a round
+    // number would stop the entire shader compiling — every Kwami on the
+    // platform, over a constant nobody would think to look at.
+    expect(KWAMI_VERTEX_SHADER).toMatch(/KWAMI_TOUCH_RADIUS = \d+\.\d+;/)
+  })
+
+  it('runs the press through the same displacement the audio uses', () => {
+    // Not added to the position afterwards: the normal is derived by sampling
+    // `displaceAt` either side of each vertex, so a dent applied outside it
+    // would be a hollow that still catches light as though it were round.
+    expect(KWAMI_VERTEX_SHADER).toContain('+ touchAt(dir)')
+    expect(KWAMI_VERTEX_SHADER).toContain('clamp(1.0 + shaped, 0.55, 1.45)')
+  })
+
+  it('keeps a press to a shape a Kwami can hold', () => {
+    // A dent that reaches past the middle turns the surface inside out on the
+    // way through, and the Kwami lights from within for a frame.
+    expect(KWAMI_VERTEX_SHADER).toContain('clamp(total, -0.7, 0.5)')
+  })
+})
+
+describe('touchSettle', () => {
+  it("is the library's own quarter-per-frame at the frame rate it assumed", () => {
+    expect(touchSettle(1 / 60)).toBeCloseTo(TOUCH_SMOOTHING, 12)
+  })
+
+  it('closes the same distance in the same time at any frame rate', () => {
+    // The bug this exists for is the one a flat per-frame constant always has:
+    // the same 0.25 is a surface arriving two and a half times faster on a
+    // 144Hz display than on the 60Hz one it was tuned against.
+    function settled(dt: number, seconds: number) {
+      let gap = 1
+      const frames = Math.round(seconds / dt)
+      for (let i = 0; i < frames; i++) gap -= gap * touchSettle(dt)
+      return 1 - gap
+    }
+    // A tenth of a second is a whole number of frames at every rate here, so
+    // any difference is the rate compensation being wrong rather than the last
+    // partial frame landing in a different place.
+    const reference = settled(1 / 60, 0.1)
+    for (const dt of [1 / 20, 1 / 50, 1 / 100, 1 / 200]) {
+      expect(settled(dt, 0.1), String(dt)).toBeCloseTo(reference, 9)
+    }
+  })
+
+  it('never overshoots the target, however long the frame', () => {
+    // A dropped frame must not send the surface past where it was going and
+    // back — a stall would show up as the Kwami flinching.
+    for (const dt of [0.001, 1 / 60, 0.1, 1, 30]) {
+      expect(touchSettle(dt), String(dt)).toBeGreaterThan(0)
+      expect(touchSettle(dt), String(dt)).toBeLessThanOrEqual(1)
+    }
+    expect(touchSettle(0)).toBe(0)
+    expect(touchSettle(Number.NaN)).toBe(0)
+  })
+
+  it('leaves the press still coming back after its own clock has run out', () => {
+    // What the smoothing is for. Feed it the curve to the last millisecond and
+    // there is still depth left over: a press retired on its duration would cut
+    // that tail off, which is the difference between something soft letting go
+    // and an animation ending.
+    let ease = 0
+    const dt = 1 / 60
+    for (let t = 0; t < 1; t += dt) ease += (touchEase(t) - ease) * touchSettle(dt)
+    expect(ease).toBeGreaterThan(0.002)
+  })
+})
+
+describe('touch scheduling', () => {
+  it('presses for about a second, which is long enough to watch it come back', () => {
+    expect(TOUCH_DURATION_MS).toBeGreaterThan(600)
+    expect(TOUCH_DURATION_MS).toBeLessThan(2000)
+  })
+
+  it('holds a handful of presses at once and no more', () => {
+    // A GLSL array is fixed length, and the loop over it runs for every vertex
+    // of a 37k-triangle mesh. This is the number that ends up in the shader.
+    expect(TOUCH_POINTS).toBeGreaterThan(1)
+    expect(TOUCH_POINTS).toBeLessThanOrEqual(8)
+  })
+
+  it('reaches further than the Kwami is wide, so the falloff does the shaping', () => {
+    // Two unit directions are at most 2 apart. A radius inside that would cut
+    // the dent off with a hard edge partway across the body.
+    expect(TOUCH_RADIUS).toBeGreaterThan(2)
+  })
+})
+
+describe('drag limits', () => {
+  it('stops short of tipping the Kwami over its own pole', () => {
+    // Over the top there is nothing worth looking at and no obvious way back,
+    // and a creator who lands there thinks the stage has broken.
+    expect(PITCH_LIMIT).toBeGreaterThan(0.5)
+    expect(PITCH_LIMIT).toBeLessThan(Math.PI / 2)
   })
 })

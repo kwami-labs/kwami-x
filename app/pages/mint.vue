@@ -182,6 +182,15 @@ function roll() {
   form.gameId = rolled.gameId
 }
 
+/**
+ * Whether anyone has taken hold of the Kwami yet.
+ *
+ * Only drives the hint on the stage. Deliberately not persisted with the rest
+ * of the draft: it is about this visit, and someone coming back a week later
+ * has earned the reminder again.
+ */
+const handled = ref(false)
+
 const paletteValid = computed(
   () => isHexColor(form.colorA) && isHexColor(form.colorB) && isHexColor(form.colorC),
 )
@@ -476,8 +485,21 @@ async function onSubmit() {
           :arousal="stageArousal"
           :activity="studio.activity.value"
           :tuning="form.tuning"
+          interactive
+          @interact="handled = true"
         />
       </div>
+
+      <!--
+        The one instruction, and only until it has been followed. A Kwami you
+        can turn over and press in is not something anyone thinks to try on a
+        panel that has looked like a rendered picture for the whole session, and
+        a label that stayed after they had tried it would be clutter over the
+        thing it is pointing at.
+      -->
+      <p class="stage__handle" :class="{ 'stage__handle--gone': handled }" aria-hidden="true">
+        Drag to turn · scroll to zoom · click to squish
+      </p>
 
       <div class="stage__top">
         <div class="stage__name">
@@ -1045,6 +1067,37 @@ async function onSubmit() {
   position: absolute;
   inset: 0;
   z-index: 1;
+}
+
+/*
+  Below the facts panel and above the meter, on the side the facts leave empty.
+  `pointer-events: none` throughout: it is a label on a thing you are meant to
+  grab, and a label that intercepts the grab is worse than no label.
+*/
+.stage__handle {
+  position: absolute;
+  z-index: 2;
+  left: 18px;
+  bottom: 86px;
+  margin: 0;
+  max-width: 40%;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: rgba(4, 5, 10, 0.55);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  color: var(--fg-dim);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  pointer-events: none;
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+
+.stage__handle--gone {
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
 }
 
 .stage__top {
