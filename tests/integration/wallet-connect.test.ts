@@ -43,9 +43,44 @@ const fakeProvider = () => ({
   publicKey: null,
   isConnected: false,
   connect: vi.fn().mockResolvedValue({ publicKey: KEY }),
+  signIn: undefined as undefined | ReturnType<typeof vi.fn>,
+  signMessage: vi.fn().mockResolvedValue({ signature: new Uint8Array(64), publicKey: KEY }),
   on: vi.fn(),
   off: vi.fn(),
 })
+
+/**
+ * Replace `window.location` with something that records instead of navigating.
+ *
+ * happy-dom treats an href assignment as a real navigation, and the mobile path
+ * is defined entirely by what it assigns.
+ */
+function captureNavigation() {
+  const seen: string[] = []
+  const original = Object.getOwnPropertyDescriptor(window, 'location')
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: {
+      origin: 'https://x.kwami.io',
+      host: 'x.kwami.io',
+      get href() {
+        return 'https://x.kwami.io/play/abc'
+      },
+      set href(next: string) {
+        seen.push(next)
+      },
+    },
+  })
+  return {
+    seen,
+    restore: () => {
+      if (original) Object.defineProperty(window, 'location', original)
+    },
+  }
+}
+
+const onPhone = () =>
+  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)')
 
 describe('connect', () => {
   beforeEach(() => {
@@ -96,5 +131,99 @@ describe('connect', () => {
 
     expect(wallet.status).toBe('disconnected')
     expect(wallet.error).toMatch(/locked/i)
+  })
+
+  it('reopens the page inside Phantom on a phone instead of pushing a download', async () => {
+    // The extension cannot exist in a phone browser, so the install page is the
+    // one thing that is guaranteed useless there.
+    onPhone()
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const nav = captureNavigation()
+    const wallet = useWalletStore()
+    wallet.status = 'unavailable'
+
+    await wallet.connect()
+
+    expect(open).not.toHaveBeenCalled()
+    expect(nav.seen[0]).toContain('phantom.app/ul/browse/')
+    // Navigating away is not guaranteed — a blocked link must not leave the
+    // button disabled on "Connecting…" forever.
+    expect(wallet.status).toBe('disconnected')
+    nav.restore()
+  })
+})
+
+describe('autoConnect', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    delete (window as Record<string, unknown>).phantom
+    delete (window as Record<string, unknown>).solana
+    vi.restoreAllMocks()
+  })
+
+  it('stops reporting Phantom missing once it injects late', async () => {
+    vi.useFakeTimers()
+    const wallet = useWalletStore()
+
+    const settling = wallet.autoConnect()
+    await vi.advanceTimersByTimeAsync(3100)
+    await settling
+    expect(wallet.status).toBe('unavailable')
+
+    // Firefox lands the provider after the wait has already given up. The
+    // verdict used to be permanent, so "Get Phantom" and the sign-in modal's
+    // "no Phantom detected" went on lying to somebody who had it installed.
+    ;(window as Record<string, unknown>).phantom = { solana: fakeProvider() }
+    window.dispatchEvent(new Event('phantom#initialized'))
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(wallet.status).toBe('connected')
+    vi.useRealTimers()
+  })
+})
+
+describe('signIn', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    delete (window as Record<string, unknown>).phantom
+    delete (window as Record<string, unknown>).solana
+    vi.restoreAllMocks()
+  })
+
+  it('offers the install page rather than only throwing', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wallet = useWalletStore()
+    wallet.status = 'unavailable'
+
+    await expect(wallet.signIn('nonce')).rejects.toThrow(/not installed/i)
+
+    // Callers await a signature, so this one has to throw — but throwing was
+    // all it used to do, which left the sign-in modal with a dead button.
+    expect(open).toHaveBeenCalledWith(PHANTOM_INSTALL_URL, '_blank', 'noopener')
+  })
+
+  it('never leaves a button stuck on Connecting… when the prompt is dismissed', async () => {
+    vi.useFakeTimers()
+    const nav = captureNavigation()
+    const provider = fakeProvider()
+    provider.signIn = vi.fn().mockRejectedValue({ code: 4001, message: 'User rejected the request' })
+    const wallet = useWalletStore()
+
+    const pending = wallet.signIn('nonce')
+    // Attached now, not after the timers run: the rejection lands while they
+    // are being advanced, and an unattached one fails the run as unhandled.
+    const settled = pending.then(
+      () => null,
+      (e: unknown) => e,
+    )
+    // Landing mid-wait is the one path that borrows `connecting` from the
+    // caller, and `signIn` throws without ever reaching a status of its own.
+    ;(window as Record<string, unknown>).phantom = { solana: provider }
+    await vi.advanceTimersByTimeAsync(200)
+
+    expect(await settled).toMatchObject({ code: 4001 })
+    expect(wallet.status).not.toBe('connecting')
+    nav.restore()
+    vi.useRealTimers()
   })
 })
