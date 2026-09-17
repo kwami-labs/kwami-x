@@ -50,7 +50,7 @@ Nothing in `shared/` reads a clock or a network. `resolveSession` takes `now`; `
 ## Coverage thresholds
 
 ```
-lines 90 · functions 91 · branches 91 · statements 90
+lines 90 · functions 91 · branches 92 · statements 90
 ```
 
 Scoped to `shared/`, `server/utils/` and `app/utils/` — the logic layers. Components are not counted, because a coverage number over a `.vue` file measures whether it rendered, not whether it is right.
