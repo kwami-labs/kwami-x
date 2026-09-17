@@ -3,6 +3,18 @@
 All notable changes to Kwami v3 are documented here. This file is generated
 from the commit history by semantic-release — do not edit it by hand.
 
+## [3.2.1](https://github.com/kwami-labs/kwami-x/compare/v3.2.0...v3.2.1) (2026-09-17)
+
+### Bug Fixes
+
+- **program:** migrate the vault onto matching Anchor 1.2 crates ([8fd10f0](https://github.com/kwami-labs/kwami-x/commit/8fd10f06906b9abfd581e785d7896b6758441e03))
+
+### Build & Dependencies
+
+- **deps:** bump the minor-and-patch group with 2 updates ([c114a41](https://github.com/kwami-labs/kwami-x/commit/c114a4150fc278174ca763a1e0246e13de764af4))
+- **program:** bump anchor-lang from 0.31.1 to 1.2.0 in /programs ([16d7dee](https://github.com/kwami-labs/kwami-x/commit/16d7dee622002cb31833cee04c2326fb6960442c))
+- **program:** bump anchor-spl from 0.31.1 to 1.2.0 in /programs ([6840390](https://github.com/kwami-labs/kwami-x/commit/6840390f7301d0ee4c7015f8141ae5e22df6cc34))
+
 ## [3.2.0](https://github.com/kwami-labs/kwami-x/compare/v3.1.0...v3.2.0) (2026-09-17)
 
 ### Features
