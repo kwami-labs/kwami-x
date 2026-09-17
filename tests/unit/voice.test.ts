@@ -9,6 +9,7 @@ import {
   readVoiceConfig,
   voiceById,
 } from '#shared/kwami/voice'
+import { NEUTRAL_TRAITS } from '#shared/kwami/traits'
 
 describe('the offered voices', () => {
   it('has no duplicate ids', () => {
@@ -63,7 +64,13 @@ describe('readVoiceConfig', () => {
   it('reads a config the builder wrote', () => {
     expect(
       readVoiceConfig({ voiceId: 'warden', gameId: 'trial', language: 'es', guardStrength: 0.4 }),
-    ).toEqual({ voiceId: 'warden', gameId: 'trial', language: 'es', guardStrength: 0.4 })
+    ).toEqual({
+      voiceId: 'warden',
+      gameId: 'trial',
+      language: 'es',
+      guardStrength: 0.4,
+      traits: NEUTRAL_TRAITS,
+    })
   })
 
   it('fills in for a Kwami minted before voices existed', () => {
@@ -82,5 +89,21 @@ describe('readVoiceConfig', () => {
   it('discards junk rather than passing it through', () => {
     const cfg = readVoiceConfig({ voiceId: 42, gameId: {}, language: '', guardStrength: 'loud' })
     expect(cfg).toEqual(DEFAULT_VOICE_CONFIG)
+  })
+})
+
+describe('readVoiceConfig traits', () => {
+  it('carries a stored trait vector through', () => {
+    expect(readVoiceConfig({ traits: { cruelty: 60 } }).traits.cruelty).toBe(60)
+  })
+
+  it('neutralises a vector that is not one', () => {
+    expect(readVoiceConfig({ traits: 'mean' }).traits).toEqual(NEUTRAL_TRAITS)
+  })
+
+  it('keeps the archetype only when there is one, so the key is absent rather than empty', () => {
+    expect(readVoiceConfig({ personaId: 'grump' }).personaId).toBe('grump')
+    expect('personaId' in readVoiceConfig({})).toBe(false)
+    expect('personaId' in readVoiceConfig({ personaId: '' })).toBe(false)
   })
 })

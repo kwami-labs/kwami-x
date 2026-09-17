@@ -18,7 +18,7 @@ vi.mock('~~/server/utils/solana', () => ({
 }))
 
 vi.stubGlobal('useRuntimeConfig', () => ({
-  public: { siteUrl: 'https://x.kwami.io' },
+  public: { siteUrl: 'https://x.kwami.io', solanaCluster: 'devnet' },
 }))
 vi.stubGlobal('createError', (opts: { statusCode: number; statusMessage: string }) => {
   const error = new Error(opts.statusMessage) as Error & { statusCode: number }
@@ -102,6 +102,24 @@ describe('verifySignedSiws', () => {
     const foreign = formatSiwsMessage({ ...BASE, domain: 'evil.example' })
     await expect(verifySignedSiws(signed({ message: foreign }))).rejects.toMatchObject({
       statusCode: 400,
+    })
+  })
+
+  it('accepts a domain that matches one of several expected hosts', async () => {
+    const tunneled = formatSiwsMessage({ ...BASE, domain: 'abc.ngrok-free.app' })
+    await expect(
+      verifySignedSiws(
+        { ...signed({ message: tunneled }), address: ADDRESS },
+        { expectedDomains: ['x.kwami.io', 'abc.ngrok-free.app'] },
+      ),
+    ).resolves.toEqual({ address: ADDRESS })
+  })
+
+  it('rejects a message signed for the wrong cluster', async () => {
+    const wrongChain = formatSiwsMessage({ ...BASE, chainId: 'mainnet' })
+    await expect(verifySignedSiws(signed({ message: wrongChain }))).rejects.toMatchObject({
+      statusCode: 400,
+      message: /chain id/i,
     })
   })
 })

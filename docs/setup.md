@@ -29,9 +29,15 @@ supabase db push         # applies supabase/migrations/*
 ```
 
 ```env
-NUXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NUXT_PUBLIC_SUPABASE_ANON_KEY=...
-NUXT_SUPABASE_SERVICE_KEY=...
+# Hosted:
+NUXT_PUBLIC_SUPABASE_PROJECT_ID=your-project-ref
+NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+NUXT_SUPABASE_SECRET_KEY=sb_secret_...
+
+# Or local `supabase start` (URL override):
+# NUXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+# NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+# NUXT_SUPABASE_SECRET_KEY=...
 ```
 
 For Google and GitHub sign-in, enable those providers in the Supabase dashboard and set the callback to `<your-site>/auth/callback`. For phone sign-in, configure an SMS provider.
@@ -91,9 +97,57 @@ For streaming voice over WebRTC instead of the browser API:
 NUXT_PUBLIC_LIVEKIT_URL=wss://your-project.livekit.cloud
 NUXT_LIVEKIT_API_KEY=
 NUXT_LIVEKIT_API_SECRET=
+NUXT_LIVEKIT_AGENT_NAME=kwami-agent
+NUXT_AGENT_API_KEY=
 ```
 
-This repository mints the room tokens. The agent worker that joins the room and speaks as the Kwami is a separate service — see [Architecture](/docs/architecture#voice-and-where-it-stops). With the variables unset, `/api/session/:id/voice-token` reports `transport: "browser"` and the game runs on the Web Speech path.
+This repository mints the room tokens, dispatches the named agent into the room and bills the connection by the second. The worker itself — the thing that joins and speaks as the Kwami — is a separate service; see [Architecture](/docs/architecture#voice-and-where-it-stops) and [Energy](/docs/energy#metering-a-voice-connection).
+
+`NUXT_LIVEKIT_AGENT_NAME` empty dispatches nothing, which is the right setting for keys without a worker: a room the player can talk into and nothing that answers is worse than the browser path. `NUXT_AGENT_API_KEY` is the shared key that worker presents to read a session's persona and phrase, and without it that callback refuses every caller.
+
+With the LiveKit variables unset, `/api/session/:id/voice-token` and `/api/studio/voice-token` report `transport: "browser"` and the game runs on the Web Speech path — which is also what happens when the balance cannot pay for a second of voice.
+
+#### Running the worker locally
+
+Voice needs three processes, and the studio's rehearsal only works when all of
+them are up:
+
+| Process          | Port | What it does                                                 |
+| ---------------- | ---- | ------------------------------------------------------------ |
+| This app         | 3000 | Mints the room token, meters the connection, holds the draft |
+| `kwami-lk-agent` | —    | Joins the room, runs STT/LLM/TTS, speaks as the Kwami        |
+| `kwami-lk-api`   | 8080 | What the worker reports usage to (`KWAMI_API_URL`)           |
+
+All three must point at the **same** LiveKit project: `NUXT_PUBLIC_LIVEKIT_URL`
+here, `LIVEKIT_URL` in the other two. `NUXT_LIVEKIT_AGENT_NAME` must match the
+name the worker registers under (`kwami-agent`, in its `agent/livekit.toml`), or
+the token dispatches a worker that does not exist and the room stays silent.
+
+```bash
+cd ../kwami-lk-agent && make dev     # registers the worker
+cd ../kwami-lk-api   && make dev     # usage + credits on :8080
+```
+
+A worker deployed to LiveKit Cloud registers under the same name and will
+compete for jobs with a local one, so stop the deployed agent while developing
+against it.
+
+#### Configuring a draft over the room
+
+A minted Kwami has a row the worker can read. A draft in the studio does not —
+it only exists in the browser — so `useVoiceLink` publishes it over the room's
+data channel instead, in the shape `kwami-lk-agent` parses: a `config` message
+on join, then a `config_update` on every edit while the room stays open. That
+second message is what makes the sliders live: `update_soul` rebuilds the
+worker's instructions on the running agent, so the character changes without
+dropping the conversation.
+
+Two keys on that message are deliberate. `greeting: false` suppresses the
+worker's default introduction, which is an assistant's opening and wrong for
+something whose whole character is that it volunteers nothing.
+`memory: {enabled: false}` keeps a rehearsal out of the worker's shared
+`kwami_default` namespace — a draft has no id to file memory under, and the
+studio promises the creator that nothing here is saved.
 
 ### 5. On-ramp
 

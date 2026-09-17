@@ -1,4 +1,4 @@
-import { isConfigured } from '#shared/config/configured'
+import { isSupabasePublicConfigured } from '#shared/config/supabase'
 
 /**
  * Who has to sign in, and where.
@@ -44,13 +44,12 @@ export function useAuthGate() {
    * sign-in method fails by design. Gating then would be a locked door with no
    * key — so a fresh clone is left open and simply explorable.
    *
-   * `isConfigured` is the server's own test, not a non-empty check. The two
-   * disagreed at first, and the result was the worst of both: `cp .env.example
-   * .env` gave you demo Kwamis behind a sign-in wall that could never open.
+   * Uses the same project-id + publishable-key check as the server, not a
+   * non-empty string test. Those disagreed at first, and the result was the
+   * worst of both: `cp .env.example .env` gave you demo Kwamis behind a
+   * sign-in wall that could never open.
    */
-  const configured = computed(
-    () => isConfigured(config.public.supabaseUrl) && isConfigured(config.public.supabaseAnonKey),
-  )
+  const configured = computed(() => isSupabasePublicConfigured(config))
 
   const exempt = computed(() => OPEN_PREFIXES.some((p) => route.path === p || route.path.startsWith(`${p}/`)))
 

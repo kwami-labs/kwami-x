@@ -1,5 +1,3 @@
-import { LAMPORTS_PER_SOL, USDC_BASE_UNITS } from '#shared/game/constants'
-
 /**
  * Display formatting.
  *
@@ -8,6 +6,10 @@ import { LAMPORTS_PER_SOL, USDC_BASE_UNITS } from '#shared/game/constants'
  * as either noise or a rounding error depending on which end you are looking
  * at. Each formatter picks precision from magnitude instead.
  */
+import { LAMPORTS_PER_SOL, USDC_BASE_UNITS } from '#shared/game/constants'
+import { paletteFor as resolvePalette, readTuning, skinFor } from '#shared/kwami/appearance'
+import type { KwamiTuning, Palette } from '#shared/kwami/appearance'
+import type { KwamiSkin } from '#shared/types/kwami'
 
 export function formatSol(lamports: bigint | number, opts: { symbol?: boolean } = {}): string {
   const sol = Number(lamports) / Number(LAMPORTS_PER_SOL)
@@ -77,3 +79,31 @@ export function relativeTime(iso: string | number | Date): string {
  * here because every component in the app already imports from this module.
  */
 export { paletteFor, paletteFromMint } from '#shared/kwami/appearance'
+
+/**
+ * Everything the avatar needs to draw a stored Kwami.
+ *
+ * One call rather than three, because the three used to be one: the card, the
+ * profile, the play stage and the embed each resolved the palette and then
+ * silently dropped the skin and the tuning on the floor. A creator could spend
+ * ten minutes in the studio choosing a chrome surface with a slow spin, mint
+ * it, and land on a profile page showing the default blob — the appearance was
+ * stored correctly and simply never read back anywhere except the studio that
+ * wrote it.
+ */
+export interface KwamiLook {
+  palette: Palette
+  skin: KwamiSkin
+  tuning: Partial<KwamiTuning>
+}
+
+export function lookFor(kwami: {
+  mint?: string | null
+  appearance?: Record<string, unknown> | null
+}): KwamiLook {
+  return {
+    palette: resolvePalette(kwami),
+    skin: skinFor(kwami),
+    tuning: readTuning(kwami.appearance),
+  }
+}

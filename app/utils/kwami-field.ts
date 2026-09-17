@@ -11,17 +11,15 @@
  * Kwami in the background of the sign-in screen is recognisably the same object
  * the arena will show a second later.
  */
-import {
-  Color,
-  IcosahedronGeometry,
-  Mesh,
-  PerspectiveCamera,
-  Scene,
-  ShaderMaterial,
-  WebGLRenderer,
-} from 'three'
+import { Mesh, PerspectiveCamera, Scene, ShaderMaterial, WebGLRenderer } from 'three'
 import { paletteFromMint } from '#shared/kwami/appearance'
-import { KWAMI_FRAGMENT_SHADER, KWAMI_VERTEX_SHADER } from './kwami-renderer'
+import {
+  KWAMI_FRAGMENT_SHADER,
+  KWAMI_VERTEX_SHADER,
+  RENDERER_PRESETS,
+  createKwamiGeometry,
+  createKwamiUniforms,
+} from './kwami-renderer'
 
 export interface KwamiFieldOptions {
   /** How many Kwamis drift in the field. */
@@ -39,7 +37,7 @@ export interface KwamiFieldHandle {
 
 interface Drifter {
   mesh: Mesh
-  uniforms: Record<string, { value: number | Color }>
+  uniforms: ReturnType<typeof createKwamiUniforms>
   /** Radians per second around the field's centre. */
   orbit: number
   /** Where this Kwami sits in its own bob cycle, so they do not pulse in unison. */
@@ -55,9 +53,8 @@ interface Drifter {
 
 /** The app's own hue derivation, so the background Kwamis are drawn from the
  *  same palette space as the real ones the arena is about to show. */
-function paletteFrom(seed: string): [Color, Color] {
-  const { a, b } = paletteFromMint(seed)
-  return [new Color(a), new Color(b)]
+function paletteFrom(seed: string) {
+  return paletteFromMint(seed)
 }
 
 export function mountKwamiField(
@@ -78,32 +75,32 @@ export function mountKwamiField(
   const camera = new PerspectiveCamera(52, 1, 0.1, 140)
   camera.position.set(0, 0, 13)
 
-  // One geometry for the whole field. Subdivision 4 rather than the avatar's 5:
-  // 3 is visibly faceted once a Kwami is large enough to read as a shape — it
-  // looks like a rock rather than something alive — and 5 is 40k vertices per
-  // Kwami for a silhouette difference nobody can see behind a blurred panel.
-  const geometry = new IcosahedronGeometry(1, 4)
+  // One geometry for the whole field, at half the avatar's resolution. These
+  // are never larger than a thumbnail and always behind a blurred panel, so the
+  // silhouette difference is invisible and the vertex cost is a quarter.
+  const geometry = createKwamiGeometry(96)
 
   const drifters: Drifter[] = []
 
   for (let i = 0; i < count; i++) {
     const seed = seeds[i]!
-    const [colorA, colorB] = paletteFrom(seed)
 
     // Golden-angle placement: successive Kwamis land as far from their
     // predecessors as the circle allows, so nine of them never clump.
     const angle = i * 2.399963
-    const uniforms = {
-      uTime: { value: Math.random() * 100 },
-      uAmplitude: { value: 0.26 + (i % 3) * 0.07 },
-      uFrequency: { value: 1.2 + (i % 4) * 0.5 },
-      uAudio: { value: 0 },
-      uArousal: { value: 0 },
-      uVitality: { value: 1 },
-      uRimPower: { value: 2.2 + (i % 3) * 0.6 },
-      uColorA: { value: colorA },
-      uColorB: { value: colorB },
-    }
+    // Built from the same preset the avatar uses, then varied — a background
+    // Kwami whose parameters were invented here would drift away from the real
+    // ones every time the blob preset was retuned.
+    const uniforms = createKwamiUniforms(
+      {
+        ...RENDERER_PRESETS['blob-xyz'],
+        amplitude: 0.18 + (i % 3) * 0.05,
+        frequency: 0.8 + (i % 4) * 0.3,
+        rimPower: 2.2 + (i % 3) * 0.6,
+      },
+      paletteFrom(seed),
+    )
+    uniforms.uTime.value = Math.random() * 100
 
     const mesh = new Mesh(
       geometry,
@@ -179,11 +176,11 @@ export function mountKwamiField(
     const t = (now - start) / 1000
 
     for (const d of drifters) {
-      d.uniforms.uTime!.value = (d.uniforms.uTime!.value as number) + dt
+      d.uniforms.uTime.value += dt
       // A slow breath in the displacement amplitude. Without it the field is
       // technically animated but visually static — the rotation alone reads as
       // a screensaver rather than something alive.
-      d.uniforms.uArousal!.value = 0.12 + Math.sin(t * 0.4 + d.phase) * 0.1
+      d.uniforms.uArousal.value = 0.12 + Math.sin(t * 0.4 + d.phase) * 0.1
 
       // Drift around the anchor rather than orbiting the origin: the ring has
       // to stay a ring, or after a minute every Kwami has migrated back into

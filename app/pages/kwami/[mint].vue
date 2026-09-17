@@ -11,6 +11,7 @@ const { data, error } = await useFetch<KwamiDetailResponse>(`/api/kwami/${mint.v
 const kwami = computed(() => data.value?.kwami)
 const sessions = computed(() => data.value?.recentSessions ?? [])
 const wallet = useWalletStore()
+const auth = useAuthStore()
 const cluster = computed(() => useRuntimeConfig().public.solanaCluster as Cluster)
 
 /**
@@ -49,8 +50,24 @@ const accounts = computed(() => {
   ].filter((a): a is { label: string; address: string; note: string } => Boolean(a.address))
 })
 
-const palette = computed(() => paletteFor(kwami.value ?? { mint: mint.value }))
+const look = computed(() => lookFor(kwami.value ?? { mint: mint.value }))
 const isOwner = computed(() => wallet.address && kwami.value?.owner_wallet === wallet.address)
+
+/**
+ * Ownership is a property of the account, not of whatever Phantom happens to
+ * have unlocked this second.
+ *
+ * Keying the owner card off the live address alone hid an owner's own controls
+ * from them the moment they arrived by shared link without connecting — no
+ * card, no prompt, nothing saying the page had anything more to show. A wallet
+ * already proven against this account answers the question without a signature;
+ * the signature is only needed to actually publish or pause.
+ */
+const ownsIt = computed(() =>
+  Boolean(
+    kwami.value?.owner_wallet && (isOwner.value || auth.boundAddresses.includes(kwami.value.owner_wallet)),
+  ),
+)
 
 const embedSnippet = computed(
   () =>
@@ -81,8 +98,11 @@ useSeoMeta({
     <section class="detail__stage card">
       <KwamiAvatar
         :renderer="kwami.renderer as never"
-        :color-a="palette.a"
-        :color-b="palette.b"
+        :skin="look.skin"
+        :color-a="look.palette.a"
+        :color-b="look.palette.b"
+        :color-c="look.palette.c"
+        :tuning="look.tuning"
         :vitality="kwami.vitality"
       />
       <span class="badge detail__state" :class="`badge--${kwami.state}`">
@@ -155,9 +175,21 @@ useSeoMeta({
               ? 'This Kwami is dead'
               : kwami.state === 'cracked'
                 ? 'Already cracked'
-                : 'Not accepting challengers'
+                : kwami.state === 'starving'
+                  ? 'Out of energy — it cannot answer'
+                  : 'Not accepting challengers'
           }}
         </button>
+        <!--
+          This is the layer that actually protects a challenger. A ticket is
+          paid on chain before any server sees it, so refusing in
+          `/api/session/start` would mean refusing someone who is already out of
+          pocket — saying so here, before the button, is what prevents it.
+        -->
+        <p v-if="kwami.state === 'starving'" class="hint">
+          Its owner has to top it up before it can take another challenger. Nothing has been lost — the pot is
+          untouched, and it comes straight back.
+        </p>
       </div>
 
       <div class="card stack gap-2">
@@ -236,12 +268,19 @@ useSeoMeta({
         </ul>
       </div>
 
-      <div v-if="isOwner" class="card stack gap-2">
+      <div v-if="ownsIt" class="card stack gap-2">
         <h3>You own this</h3>
         <div class="row gap-2" style="flex-wrap: wrap">
           <NuxtLink :to="`/builder/${kwami.mint}`" class="btn btn--ghost">Open program builder</NuxtLink>
           <NuxtLink :to="`/kwami/${kwami.mint}/manage`" class="btn btn--ghost">Publish / pause</NuxtLink>
         </div>
+        <template v-if="!isOwner">
+          <p class="muted">
+            Connect {{ shortAddress(kwami.owner_wallet) }} to publish or pause — the chain checks the
+            signature, not the session.
+          </p>
+          <ConnectWallet />
+        </template>
       </div>
     </section>
   </div>

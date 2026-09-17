@@ -9,15 +9,19 @@ const q = computed(() => route.query)
 const { data } = await useFetch<KwamiDetailResponse>(`/api/kwami/${mint.value}`)
 const kwami = computed(() => data.value?.kwami ?? null)
 
-const palette = computed(() => {
-  const derived = paletteFor(kwami.value ?? { mint: mint.value })
-  // A host site can retint the Kwami to fit its own design without losing the
-  // silhouette that makes it recognisable.
-  return {
-    a: typeof q.value.colorA === 'string' ? `#${q.value.colorA.replace('#', '')}` : derived.a,
-    b: typeof q.value.colorB === 'string' ? `#${q.value.colorB.replace('#', '')}` : derived.b,
-  }
-})
+const look = computed(() => lookFor(kwami.value ?? { mint: mint.value }))
+
+/** A host site can retint the Kwami to fit its own design without losing the
+ *  silhouette that makes it recognisable. */
+function override(param: unknown, fallback: string): string {
+  return typeof param === 'string' ? `#${param.replace('#', '')}` : fallback
+}
+
+const palette = computed(() => ({
+  a: override(q.value.colorA, look.value.palette.a),
+  b: override(q.value.colorB, look.value.palette.b),
+  c: override(q.value.colorC, look.value.palette.c),
+}))
 
 const showChrome = computed(() => q.value.chrome !== 'off')
 const interactive = computed(() => q.value.interactive !== 'off')
@@ -49,8 +53,11 @@ const href = computed(() => `${useRuntimeConfig().public.siteUrl}/kwami/${mint.v
   <div v-if="kwami" class="embed">
     <KwamiAvatar
       :renderer="kwami.renderer as never"
+      :skin="look.skin"
       :color-a="palette.a"
       :color-b="palette.b"
+      :color-c="palette.c"
+      :tuning="look.tuning"
       :vitality="kwami.vitality"
       :level="idle"
     />

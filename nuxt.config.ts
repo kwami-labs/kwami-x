@@ -21,7 +21,11 @@ export default defineNuxtConfig({
    * is only ever read inside `server/`.
    */
   runtimeConfig: {
-    supabaseServiceKey: '',
+    /**
+     * Supabase secret key (`sb_secret_…`). Bypasses RLS.
+     * Server-only — never nest under `public` or prefix with `NUXT_PUBLIC_`.
+     */
+    supabaseSecretKey: '',
     solanaRpcUrl: '',
     /** Base58 secret key of the win-attestation oracle. Never leaves the server. */
     oracleSecretKey: '',
@@ -30,12 +34,29 @@ export default defineNuxtConfig({
     moonpaySecretKey: '',
     livekitApiKey: '',
     livekitApiSecret: '',
+    /**
+     * The named LiveKit agent to dispatch into a Kwami's room.
+     *
+     * Empty dispatches nothing, which is the right posture for a deployment
+     * with LiveKit keys but no worker running: a room the player can talk into
+     * and nothing that answers is worse than the browser path.
+     */
+    livekitAgentName: 'kwami-agent',
+    /**
+     * Shared key the voice worker presents to read a session's persona and
+     * secret. Server-to-server only — see `server/api/internal/kwamis/[id]/runtime.get.ts`.
+     */
+    agentApiKey: '',
     openaiApiKey: '',
     anthropicApiKey: '',
 
     public: {
+      /** Hosted project ref; URL becomes `https://{id}.supabase.co` when `supabaseUrl` is empty. */
+      supabaseProjectId: '',
+      /** Optional override (local `supabase start` → `http://127.0.0.1:54321`). */
       supabaseUrl: '',
-      supabaseAnonKey: '',
+      /** Publishable key (`sb_publishable_…`). Safe in the browser with RLS. */
+      supabasePublishableKey: '',
       solanaCluster: 'devnet',
       solanaRpcUrl: 'https://api.devnet.solana.com',
       kwamiProgramId: 'DoQubWtmNa4WZTLWxe1iptCDrwf81M8LHDrZDP7pEBbL',
@@ -55,6 +76,19 @@ export default defineNuxtConfig({
       platformTreasury: '',
       /** Flat SOL commission per mint. Decimal string; see commissionToLamports. */
       mintCommissionSol: '0.5',
+      /**
+       * How much energy one SOL buys.
+       *
+       * Public because the studio quotes the fuel a creator is about to buy
+       * before they approve the transaction, and a number the browser had to
+       * ask the server for would be a number the page could not show while the
+       * slider was moving.
+       *
+       * A deployment setting rather than a constant: the real cost of a reply
+       * is denominated in dollars and SOL is not, so an operator has to be able
+       * to move this without a release.
+       */
+      energyPerSol: '20000',
     },
   },
 

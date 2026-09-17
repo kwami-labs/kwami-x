@@ -17,12 +17,16 @@
  *    disconnecting. A game with money in escrow has to react to that
  *    immediately rather than keep signing as the wrong wallet.
  */
-import type { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js'
+import { PublicKey } from '@solana/web3.js'
+import type { Transaction, VersionedTransaction } from '@solana/web3.js'
+import bs58 from 'bs58'
 
 export interface PhantomSignInInput {
   domain: string
   address?: string
   statement?: string
+  uri?: string
+  version?: string
   nonce: string
   chainId?: string
   issuedAt?: string
@@ -30,11 +34,61 @@ export interface PhantomSignInInput {
 }
 
 export interface PhantomSignInOutput {
-  address: PublicKey
+  /** Phantom's provider shape — a PublicKey or, on some builds, a base58 string. */
+  address?: PublicKey | string
+  /** Wallet-standard shape — used when the provider wraps the standard feature. */
+  account?: { address?: string; publicKey?: Uint8Array }
   /** The exact SIWS message the wallet displayed and signed. */
-  signedMessage: Uint8Array
-  signature: Uint8Array
+  signedMessage: Uint8Array | string
+  signature: Uint8Array | number[] | string
   signatureType?: string
+}
+
+/**
+ * Collapse Phantom / wallet-standard `signIn` outputs into one shape.
+ *
+ * Phantom's injected provider has returned `address` as a PublicKey, as a
+ * base58 string, and (via the wallet-standard bridge) as `account.address`.
+ * Treating any one of those as canonical crashes the others, so normalise
+ * once at the boundary rather than sprinkling defensive casts through the
+ * store.
+ */
+export function normalizeSignInOutput(out: PhantomSignInOutput): {
+  address: string
+  message: string
+  signature: Uint8Array
+} {
+  let address: string | null = null
+  if (typeof out.address === 'string' && out.address.length > 0) {
+    address = out.address
+  } else if (out.address instanceof PublicKey) {
+    address = out.address.toBase58()
+  } else if (typeof out.account?.address === 'string' && out.account.address.length > 0) {
+    address = out.account.address
+  } else if (out.account?.publicKey) {
+    address = new PublicKey(out.account.publicKey).toBase58()
+  }
+  if (!address) throw new Error('Phantom returned no address from sign-in.')
+
+  const message =
+    typeof out.signedMessage === 'string'
+      ? out.signedMessage
+      : new TextDecoder().decode(
+          out.signedMessage instanceof Uint8Array ? out.signedMessage : Uint8Array.from(out.signedMessage),
+        )
+
+  let signature: Uint8Array
+  if (typeof out.signature === 'string') {
+    signature = bs58.decode(out.signature)
+  } else if (out.signature instanceof Uint8Array) {
+    signature = out.signature
+  } else if (Array.isArray(out.signature)) {
+    signature = Uint8Array.from(out.signature)
+  } else {
+    throw new Error('Phantom returned no signature from sign-in.')
+  }
+
+  return { address, message, signature }
 }
 
 export interface PhantomProvider {
@@ -138,17 +192,40 @@ export function isUserRejection(error: unknown): boolean {
   return message.includes('user rejected') || message.includes('user denied')
 }
 
+/**
+ * What the user was trying to do when the wallet refused.
+ *
+ * Phantom's error codes are per-provider, not per-method: the same `-32603`
+ * comes back from `connect`, `signMessage` and `signAndSendTransaction` alike.
+ * Without knowing which was asked for, the only honest description is a vague
+ * one — and the description this used to give was worse than vague, because it
+ * named a transaction. Someone pressing "Connect wallet" on a browser where
+ * Phantom is installed but has never been set up was told their transaction had
+ * failed simulation, which is untrue, unactionable, and sends them looking for
+ * a problem with their money.
+ */
+export type WalletAction = 'connect' | 'send'
+
 /** Turn a Phantom error into something worth putting in front of a person. */
-export function describeWalletError(error: unknown): string {
-  if (isUserRejection(error)) return 'You dismissed the wallet prompt.'
+export function describeWalletError(error: unknown, action: WalletAction = 'send'): string {
+  if (isUserRejection(error)) {
+    return action === 'connect' ? 'You dismissed the connection request.' : 'You dismissed the wallet prompt.'
+  }
   const code = (error as { code?: number })?.code
   switch (code) {
     case 4900:
       return 'Phantom is locked. Open it and unlock, then try again.'
     case 4100:
-      return 'Phantom has not authorised this site yet. Connect first.'
+      return action === 'connect'
+        ? 'Phantom would not authorise this site. Open Phantom, check it is unlocked and on the right account, then try again.'
+        : 'Phantom has not authorised this site yet. Connect first.'
     case -32603:
-      return 'Phantom could not process the transaction. It may have failed simulation.'
+      // JSON-RPC "internal error". On a transaction it usually is simulation;
+      // on a connect it is almost always an extension with no wallet in it yet,
+      // which is a state a person can actually get themselves out of.
+      return action === 'send'
+        ? 'Phantom could not process the transaction. It may have failed simulation.'
+        : 'Phantom could not complete the request. If you have just installed it, finish setting up a wallet there, then reload this page.'
     default:
       return (error as { message?: string })?.message ?? 'Something went wrong talking to Phantom.'
   }

@@ -34,13 +34,13 @@ Same shape, EIP-4361 message and a `0x`-prefixed 65-byte signature.
 
 ### `GET /api/kwami`
 
-| Query    | Default | Values                                 |
-| -------- | ------- | -------------------------------------- |
-| `state`  | `live`  | `live` `paused` `cracked` `dead` `all` |
-| `sort`   | `pot`   | `pot` `new` `contested`                |
-| `limit`  | 24      | 1–60                                   |
-| `offset` | 0       |                                        |
-| `owner`  | —       | filter by owner wallet                 |
+| Query    | Default | Values                                            |
+| -------- | ------- | ------------------------------------------------- |
+| `state`  | `live`  | `live` `paused` `starving` `cracked` `dead` `all` |
+| `sort`   | `pot`   | `pot` `new` `contested`                           |
+| `limit`  | 24      | 1–60                                              |
+| `offset` | 0       |                                                   |
+| `owner`  | —       | filter by owner wallet                            |
 
 ```json
 ← { "demo": false, "kwamis": [...], "totals": { "pot": 0, "live": 0, "sessions": 0 } }
@@ -116,14 +116,34 @@ Asks the Kwami to answer. Runs server-side because the persona prompt contains t
 
 ### `POST /api/session/:id/voice-token` — auth, player only
 
-Issues a LiveKit token scoped to this session's room, expiring in five minutes.
+Issues a LiveKit token scoped to this session's room and asks LiveKit to dispatch the named worker into it.
 
 ```json
-← { "transport": "livekit", "url": "wss://…", "room": "kwami-…", "token": "…" }
-← { "transport": "browser" }   // when LiveKit is not configured
+← { "transport": "livekit", "url": "wss://…", "room": "kwami-…", "token": "…", "secondsLeft": 150 }
+← { "transport": "browser", "reason": "starving" }   // no LiveKit, or no energy to pay for it
 ```
 
-Reports `transport: "browser"` rather than failing when LiveKit is absent, so the client falls back to the Web Speech path instead of the session dying. The token never grants room admin — a player must not be able to evict the agent from the room they are trying to beat.
+The token expires at the smaller of what is left on the clock and what the Kwami's energy can pay for — the ceiling half of [voice metering](/docs/energy#metering-a-voice-connection). It never grants room admin: a player must not be able to evict the agent from the room they are trying to beat. Its dispatch claim carries the session id and nothing else, because the player can decode their own token.
+
+Reports `transport: "browser"` rather than failing whenever the upgrade is unavailable, so the client falls back to the Web Speech path instead of the session dying.
+
+### `POST /api/session/:id/voice-tick` — auth, player only
+
+Bills the room for the seconds it has held open since the last tick. Takes no duration: the amount is computed from the session's chain-anchored `started_at`, because the balance being spent belongs to the Kwami's owner and not to the person on the microphone.
+
+```json
+← { "balance": "3500", "secondsLeft": 70, "starved": false }
+```
+
+`starved: true` is a 200, not a 402. The challenger paid for this window and keeps it — the client drops the room and finishes on the browser path.
+
+### `GET /api/internal/kwamis/:id/runtime` — agent key only
+
+Everything the voice worker needs to speak as this Kwami: persona, voice, game, guard strength, traits **and the phrase it is guarding**, already compiled into the `config` message `kwami-lk-agent` parses. The only route that returns a secret outside a verified win, and the reason it can is that it is server-to-server — authenticated by `X-Kwami-API-Key` against `NUXT_AGENT_API_KEY`, never by a user's session. Unset key is a 503; wrong key is a 401; a session that is over is a 409.
+
+`:id` is a **session** id, not a Kwami id. The path is the worker's URL template rather than ours — it builds `{KWAMI_RUNTIME_API_URL}/internal/kwamis/{id}/runtime` — and a session is the right key anyway: it is what expires, what was paid for, and what decides whether the phrase may still be handed out.
+
+The studio never calls this. A draft has no row to look up, so it publishes the same message over the room's data channel, which is safe only because the creator is the sole participant.
 
 ### `POST /api/session/:id/claimed` — auth, player only
 
@@ -140,6 +160,93 @@ Returns an HMAC-signed MoonPay widget URL. Signing happens server-side because t
 ### `POST /api/builder/generate` — auth, author only
 
 Generates an Anchor extension from a brief. Requires the Kwami to be in `minted` state.
+
+## Energy
+
+### `GET /api/kwami/:mint/energy` — auth, author only
+
+Balance, derived state and the last twenty ledger rows. Author-only including the ledger: how
+heavily a Kwami is being talked to is competitive information.
+
+```json
+← { "balance": "38000", "state": "full", "kwamiState": "live",
+    "energyPerSol": 20000, "ledger": [...] }
+```
+
+Balances are strings. They are `bigint` everywhere else and JSON has no such thing; a number would
+round past 2^53, and this is the one figure on the page that has to be exact.
+
+### `POST /api/kwami/:mint/energy/topup` — auth
+
+Credits energy against an already-confirmed payment.
+
+```json
+→ { "signature": "<base58>" }
+← { "balance": "58000", "state": "full", "kwamiState": "live" }
+```
+
+The signature is fetched from the cluster and the **treasury's own balance delta** is what gets
+credited — a client asserting "I paid" is worth nothing when the reward for lying is free inference.
+Idempotent on the signature, so a retry after a lost response cannot double it.
+
+Not author-gated. Anyone may fuel anyone's Kwami; there is no way to abuse paying for someone else's
+running costs.
+
+## Studio
+
+### `GET /api/studio/energy`
+
+The account's pre-mint trial allowance, granted on first read. Answers for a signed-out or demo
+caller too, with the full allowance — the meter is on screen before anything is spent, and a dash
+there reads as broken rather than as "not yet".
+
+### `POST /api/studio/preview`
+
+Talk to a Kwami that has not been minted. Takes the unsaved draft, spends the Kwami's own energy
+once it exists and the account's trial before that, and returns the reply.
+
+```json
+→ { "persona", "gameId", "guardStrength", "traits", "secret", "history", "utterance", "mint?" }
+← { "text": "…", "source": "trial", "cost": "1000", "balance": "39000" }
+```
+
+It calls the same `respond()` the live game calls — including the redaction pass — rather than a
+preview-only imitation. A test drive that exercised different code from the real thing would be
+worse than none: it would build confidence in behaviour that was never going to happen.
+
+Returns **402** when the balance cannot cover a reply. That is an outcome, not a failure: the
+creator has not done anything wrong, they have used the thing up, and the page offers them fuel.
+
+### `POST /api/studio/voice-token`
+
+The same rehearsal over a streaming connection. Opens a room for the account's own draft, with a
+token that expires when the trial allowance would.
+
+```json
+← { "transport": "livekit", "url": "wss://…", "room": "studio-…", "token": "…", "secondsLeft": 800 }
+← { "transport": "browser", "reason": "exhausted" }   // no LiveKit, no Supabase, or nothing left
+```
+
+The draft reaches the worker over the room's data channel rather than a callback — there is no row
+to call back about. That includes the phrase, which is safe here and nowhere else: the only
+participant is the creator, who typed it.
+
+### `POST /api/studio/voice-tick`
+
+Bills an open studio room against the trial allowance.
+
+```json
+→ { "seconds": 15 }
+← { "balance": "38250", "secondsLeft": 765 }
+```
+
+`seconds` is clamped server-side to one tick interval. Unlike the session tick it trusts the client
+to report at all, because the only balance it can spend is the caller's own. Returns **402** when
+the allowance runs out, and the studio shows the same "add fuel" notice a spent preview does.
+
+This is the one mutating-ish route that does **not** refuse in demo mode. Mutating routes return 503
+there because they would have to pretend to have written something; this one writes nothing, and the
+scripted brain needs no API key. A fresh clone should be able to hear a Kwami talk.
 
 ## Docs
 

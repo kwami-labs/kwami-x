@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { H3Event } from 'h3'
+import { resolveSupabaseUrl } from '#shared/config/supabase'
+import { walletEmail } from '#shared/auth/profile'
 import { serviceClient } from './supabase'
 import { toChecksumAddress } from './eth'
 
@@ -44,7 +46,7 @@ export async function issueWalletSession(event: H3Event, input: WalletSessionInp
   // A synthetic address is needed because Supabase keys auth users by email.
   // The domain is non-routable on purpose: nothing should ever try to deliver
   // mail to it, and a user who later adds a real email keeps this same row.
-  const email = `${input.chain}-${lookupKey}@wallet.kwami.invalid`
+  const email = walletEmail(input.chain, lookupKey)
 
   if (!userId) {
     const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -66,6 +68,11 @@ export async function issueWalletSession(event: H3Event, input: WalletSessionInp
       chain: input.chain,
       address,
       address_lower: lookupKey,
+      // This is the first wallet on a brand-new account, so on Solana it is
+      // also the payout destination. Leaving it non-primary produced an account
+      // whose only wallet was not the one the app would pay — and the profile
+      // page had nothing to offer as an alternative.
+      is_primary: input.chain === 'solana',
     })
     // A unique-violation here means a concurrent request won the race; that is
     // fine, the user exists either way.
@@ -82,12 +89,16 @@ export async function issueWalletSession(event: H3Event, input: WalletSessionInp
     throw createError2(linkError?.message ?? 'Could not issue a session.')
   }
 
-  // Redeem with an anon client: `verifyOtp` returns a session only for a
-  // client that does not already hold service-role credentials.
-  const anon = createClient(config.public.supabaseUrl as string, config.public.supabaseAnonKey as string, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-  const { data: verified, error: verifyError } = await anon.auth.verifyOtp({
+  // Redeem with a publishable-key client: `verifyOtp` returns a session only
+  // for a client that does not already hold secret-key credentials.
+  const publishable = createClient(
+    resolveSupabaseUrl(config),
+    config.public.supabasePublishableKey as string,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    },
+  )
+  const { data: verified, error: verifyError } = await publishable.auth.verifyOtp({
     token_hash: link.properties.hashed_token,
     type: 'email',
   })

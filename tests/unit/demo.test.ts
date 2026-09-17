@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { evaluateDeath, vaultUsd, vitality } from '#shared/game/economy'
 
 const config = {
-  public: { supabaseUrl: 'https://your-project.supabase.co' },
-  supabaseServiceKey: 'sk_test_...',
+  public: {
+    supabaseUrl: '',
+    supabaseProjectId: 'your-project',
+    supabasePublishableKey: 'sb_publishable_...',
+  },
+  supabaseSecretKey: 'sb_secret_...',
 }
 
 vi.stubGlobal('useRuntimeConfig', () => config)
@@ -127,17 +131,19 @@ describe('demoSessions', () => {
 
 describe('isDemoMode / assertNotDemo', () => {
   beforeEach(() => {
-    config.public.supabaseUrl = 'https://your-project.supabase.co'
-    config.supabaseServiceKey = 'sk_test_...'
+    config.public.supabaseUrl = ''
+    config.public.supabaseProjectId = 'your-project'
+    config.public.supabasePublishableKey = 'sb_publishable_...'
+    config.supabaseSecretKey = 'sb_secret_...'
   })
 
   it('treats .env.example placeholders as demo mode', () => {
     expect(isDemoMode()).toBe(true)
   })
 
-  it('leaves demo mode once both credentials look real', () => {
-    config.public.supabaseUrl = 'https://abcdefgh.supabase.co'
-    config.supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'
+  it('leaves demo mode once project id and secret key look real', () => {
+    config.public.supabaseProjectId = 'svxhshwgdigbsbjczzou'
+    config.supabaseSecretKey = 'sb_secret_FB0YsRealLookingKeyValueHere'
     expect(isDemoMode()).toBe(false)
   })
 
@@ -146,8 +152,8 @@ describe('isDemoMode / assertNotDemo', () => {
   })
 
   it('allows writes once credentials are real', () => {
-    config.public.supabaseUrl = 'https://abcdefgh.supabase.co'
-    config.supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'
+    config.public.supabaseProjectId = 'svxhshwgdigbsbjczzou'
+    config.supabaseSecretKey = 'sb_secret_FB0YsRealLookingKeyValueHere'
     expect(() => assertNotDemo()).not.toThrow()
   })
 })

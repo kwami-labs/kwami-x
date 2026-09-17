@@ -8,6 +8,8 @@ import {
   resolveCodegenModel,
 } from '#shared/codegen/config'
 import { readVoiceConfig } from '#shared/kwami/voice'
+import { spendKwamiEnergy } from '~~/server/utils/energy'
+import { toEnergy } from '#shared/energy/cost'
 import { requireUser, serviceClient } from '~~/server/utils/supabase'
 import { assertNotDemo } from '~~/server/utils/demo'
 
@@ -67,6 +69,28 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 409,
       statusMessage: 'Extensions can only be attached before a Kwami first goes live.',
+    })
+  }
+
+  /**
+   * Charge before generating, and refuse outright if it cannot be paid.
+   *
+   * Unlike a session reply, there is nobody else's paid time at stake here — it
+   * is the owner spending their own Kwami's energy on their own tooling — so
+   * this one fails closed rather than degrading. There is also no useful
+   * degraded mode: a scripted deflector can still keep a conversation going,
+   * but there is no scripted fallback that writes Anchor.
+   *
+   * A generation costs two orders of magnitude more than a reply, which is
+   * honest — most of a minute of a reasoning model. Taking it up front means an
+   * owner iterating on a brief sees the balance move as they work, rather than
+   * discovering the afternoon's cost afterwards.
+   */
+  const spend = await spendKwamiEnergy(kwami.id, { kind: 'codegen' }, 'codegen', { name: body.name }, db)
+  if (!spend.ok) {
+    throw createError({
+      statusCode: 402,
+      statusMessage: `Generating a program costs ${toEnergy(spend.cost)} energy and this Kwami has ${toEnergy(spend.balance)}. Top it up to carry on.`,
     })
   }
 

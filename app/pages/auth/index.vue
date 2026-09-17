@@ -29,7 +29,10 @@ watchEffect(() => {
   if (auth.ready && auth.isSignedIn) void done()
 })
 
-useSeoMeta({ title: 'Sign in — Kwami' })
+useSeoMeta({
+  title: 'Sign in — Kwami',
+  description: 'Sign in with Phantom, email, phone, Google, or GitHub to play Kwami.',
+})
 </script>
 
 <template>

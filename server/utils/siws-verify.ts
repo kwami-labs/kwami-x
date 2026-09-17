@@ -1,5 +1,7 @@
 import bs58 from 'bs58'
-import { parseSiwsMessage, validateSiwsMessage } from '#shared/auth/siws'
+import type { H3Event } from 'h3'
+import { parseSiwsMessage, validateSiwsMessage, SOLANA_CHAIN_IDS } from '#shared/auth/siws'
+import type { Cluster } from '#shared/solana/constants'
 import { consumeNonce } from './nonce'
 import { verifySolanaSignature } from './solana'
 
@@ -9,6 +11,17 @@ export interface SignedSiws {
   /** base58-encoded ed25519 signature. */
   signature: string
   address: string
+}
+
+export interface VerifySiwsOptions {
+  /**
+   * Hostnames this deployment answers on.
+   *
+   * Defaults to `siteUrl` alone. Callers that have the request should also pass
+   * the Host header so a tunnel or `127.0.0.1` login is not rejected for
+   * disagreeing with a localhost `siteUrl`.
+   */
+  expectedDomains?: string | readonly string[]
 }
 
 /**
@@ -25,7 +38,10 @@ export interface SignedSiws {
  * spending a curve operation, and the nonce is consumed before the signature is
  * checked so a burst of retries with one nonce cannot be used to grind at it.
  */
-export async function verifySignedSiws(input: SignedSiws): Promise<{ address: string }> {
+export async function verifySignedSiws(
+  input: SignedSiws,
+  opts: VerifySiwsOptions = {},
+): Promise<{ address: string }> {
   const config = useRuntimeConfig()
 
   const parsed = parseSiwsMessage(input.message)
@@ -41,11 +57,15 @@ export async function verifySignedSiws(input: SignedSiws): Promise<{ address: st
   const nonceCheck = await consumeNonce(parsed.nonce, parsed.address)
   if (!nonceCheck.ok) throw createError({ statusCode: 400, statusMessage: nonceCheck.reason })
 
-  const expectedDomain = new URL(config.public.siteUrl as string).host
+  const siteHost = new URL(config.public.siteUrl as string).host
+  const expectedDomain = opts.expectedDomains ?? siteHost
+  const cluster = (config.public.solanaCluster as Cluster) || 'devnet'
+
   const validation = validateSiwsMessage(parsed, {
     expectedDomain,
     expectedNonce: parsed.nonce,
     expectedAddress: parsed.address,
+    expectedChainId: SOLANA_CHAIN_IDS[cluster],
   })
   if (!validation.valid) throw createError({ statusCode: 400, statusMessage: validation.reason })
 
@@ -54,4 +74,12 @@ export async function verifySignedSiws(input: SignedSiws): Promise<{ address: st
   }
 
   return { address: parsed.address }
+}
+
+/** Hostnames the SIWS domain check should accept for this request. */
+export function siwsExpectedDomains(event: H3Event): string[] {
+  const config = useRuntimeConfig()
+  const siteHost = new URL(config.public.siteUrl as string).host
+  const requestHost = getRequestURL(event).host
+  return siteHost === requestHost ? [siteHost] : [siteHost, requestHost]
 }

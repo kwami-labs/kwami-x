@@ -7,6 +7,10 @@ import {
   paletteFromMint,
   suggestPalette,
   toAppearance,
+  TUNING_RANGES,
+  readTuning,
+  thirdColor,
+  toTuning,
 } from '#shared/kwami/appearance'
 
 describe('isHexColor', () => {
@@ -101,9 +105,34 @@ describe('paletteFor', () => {
   it('prefers the palette the creator chose', () => {
     const palette = paletteFor({
       mint: 'Kw1Ora111111111111111111111111111111111111111',
-      appearance: { colorA: '#ff0000', colorB: '#00ff00' },
+      appearance: { colorA: '#ff0000', colorB: '#00ff00', colorC: '#0000ff' },
     })
-    expect(palette).toEqual({ a: '#ff0000', b: '#00ff00' })
+    expect(palette).toEqual({ a: '#ff0000', b: '#00ff00', c: '#0000ff' })
+  })
+
+  it('derives a third colour for a Kwami minted before skins existed', () => {
+    // The tricolour skins are half the catalogue, and a stored pair is what
+    // every Kwami minted before them has. Falling back to grey there would put
+    // a dead band through the middle of `radial` on all of them.
+    const stored = { colorA: '#ff0000', colorB: '#00ff00' }
+    const palette = paletteFor({ mint: 'Kw1Ora1', appearance: stored })
+    expect(palette.a).toBe('#ff0000')
+    expect(palette.b).toBe('#00ff00')
+    expect(isHexColor(palette.c)).toBe(true)
+    expect(palette.c).toBe(thirdColor('#ff0000', '#00ff00'))
+    // Deterministic, so the same old Kwami renders identically everywhere.
+    expect(paletteFor({ mint: 'Kw1Ora1', appearance: stored }).c).toBe(palette.c)
+  })
+
+  it('ignores a malformed third rather than dropping the pair with it', () => {
+    // The palette is a pairing and falls back whole; the third is a repair for
+    // a Kwami that never had one, so a bad value repairs the same way.
+    const palette = paletteFor({
+      mint: 'Kw1Ora1',
+      appearance: { colorA: '#ff0000', colorB: '#00ff00', colorC: 'chartreuse' },
+    })
+    expect(palette.a).toBe('#ff0000')
+    expect(palette.c).toBe(thirdColor('#ff0000', '#00ff00'))
   })
 
   it('falls back to the mint hash when no appearance was stored', () => {
@@ -158,5 +187,72 @@ describe('suggestPalette', () => {
 
   it('has no duplicate ids', () => {
     expect(new Set(KWAMI_PALETTES.map((p) => p.id)).size).toBe(KWAMI_PALETTES.length)
+  })
+})
+
+describe('readTuning', () => {
+  it('reads nothing from a Kwami minted before tuning existed', () => {
+    expect(readTuning({})).toEqual({})
+    expect(readTuning(null)).toEqual({})
+    expect(readTuning(undefined)).toEqual({})
+    expect(readTuning({ colorA: '#7c5cff', colorB: '#3ddc97' })).toEqual({})
+  })
+
+  it('clamps each tunable into the range the shader still renders in', () => {
+    // Amplitude past 1 turns the sphere inside out through its own centre, and
+    // a particle count in the thousands costs more frame budget than the mesh.
+    expect(readTuning({ tuning: { amplitude: 99 } }).amplitude).toBe(TUNING_RANGES.amplitude.max)
+    expect(readTuning({ tuning: { amplitude: -99 } }).amplitude).toBe(TUNING_RANGES.amplitude.min)
+    expect(readTuning({ tuning: { particles: 100_000 } }).particles).toBe(TUNING_RANGES.particles.max)
+    expect(readTuning({ tuning: { frequency: 0 } }).frequency).toBe(TUNING_RANGES.frequency.min)
+  })
+
+  it('keeps the tunables that parsed and drops only the ones that did not', () => {
+    // Deliberately unlike `paletteFor`, which falls back all-or-nothing. The
+    // palette is a pairing; these are independent, and a Kwami whose spin
+    // survived a corrupted amplitude is still what its creator designed in
+    // every respect that parsed.
+    const tuning = readTuning({ tuning: { spin: 0.3, amplitude: 'fast' } })
+    expect(tuning.spin).toBe(0.3)
+    expect(tuning.amplitude).toBeUndefined()
+  })
+
+  it('ignores a tuning blob that is not an object', () => {
+    expect(readTuning({ tuning: 'loud' })).toEqual({})
+    expect(readTuning({ tuning: null })).toEqual({})
+  })
+})
+
+describe('toTuning', () => {
+  it('reports nothing rather than an empty object when nothing survives', () => {
+    // `toAppearance` leaves the key off entirely in that case, so a Kwami is
+    // never stored as "tuned, to nothing".
+    expect(toTuning({})).toBeUndefined()
+    expect(toTuning(null)).toBeUndefined()
+    expect(toTuning({ amplitude: Number.NaN })).toBeUndefined()
+  })
+
+  it('keeps a real override', () => {
+    expect(toTuning({ spin: 0.25 })).toEqual({ spin: 0.25 })
+  })
+})
+
+describe('toAppearance with tuning', () => {
+  it('round-trips tuning through storage', () => {
+    const stored = toAppearance({ a: '#123456', b: '#abcdef' }, { spin: 0.25, rimPower: 3 })
+    expect(readTuning(stored)).toEqual({ spin: 0.25, rimPower: 3 })
+  })
+
+  it('omits the key entirely when the creator tuned nothing', () => {
+    expect(toAppearance({ a: '#123456', b: '#abcdef' })).toEqual({
+      colorA: '#123456',
+      colorB: '#abcdef',
+    })
+  })
+
+  it('stores nothing at all when the palette is unusable, tuning or not', () => {
+    // Tuning without a palette would be an appearance that renders as the
+    // mint-hash fallback wearing someone else's motion.
+    expect(toAppearance({ a: '#123456', b: 'chartreuse' }, { spin: 0.25 })).toEqual({})
   })
 })

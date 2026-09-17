@@ -28,15 +28,16 @@ The loader is dependency-free, framework-free and under 2KB. It runs on someone 
 
 ## Options
 
-| Attribute                | Query param       | Effect                                    |
-| ------------------------ | ----------------- | ----------------------------------------- |
-| `data-size`              | —                 | Square size in pixels (default 320)       |
-| `data-chrome="off"`      | `chrome=off`      | Hides the name and pot overlay            |
-| `data-interactive="off"` | `interactive=off` | Removes the "Challenge" link              |
-| `data-color-a`           | `colorA`          | Override the primary colour (hex, no `#`) |
-| `data-color-b`           | `colorB`          | Override the accent colour                |
+| Attribute                | Query param       | Effect                                 |
+| ------------------------ | ----------------- | -------------------------------------- |
+| `data-size`              | —                 | Square size in pixels (default 320)    |
+| `data-chrome="off"`      | `chrome=off`      | Hides the name and pot overlay         |
+| `data-interactive="off"` | `interactive=off` | Removes the "Challenge" link           |
+| `data-color-a`           | `colorA`          | Override the core colour (hex, no `#`) |
+| `data-color-b`           | `colorB`          | Override the rim colour                |
+| `data-color-c`           | `colorC`          | Override the accent colour             |
 
-Colour overrides let a host retint a Kwami to match its own design without losing the silhouette that makes it recognisable.
+Colour overrides let a host retint a Kwami to match its own design without losing the silhouette that makes it recognisable. A Kwami's **skin** — the surface material its creator chose, one of twenty-two — is not overridable: it is as much a part of the object's identity as its name, and a host that could swap `chrome` for `halftone` would be showing a different Kwami.
 
 ## Design notes
 
@@ -72,15 +73,26 @@ For a native app or a custom canvas, `app/utils/kwami-renderer.ts` is self-conta
 import { mountKwami } from '~/utils/kwami-renderer'
 
 const handle = mountKwami(canvas, {
+  // The body: how it moves. One of five.
   renderer: 'crystal-ball',
+  // The surface: what it is made of. One of twenty-two, listed in
+  // `shared/kwami/skins.ts`, and orthogonal to the body.
+  skin: 'iridescent',
   colorA: '#7c5cff',
   colorB: '#3ddc97',
+  colorC: '#ff5cb8',
   vitality: 0.8,
+  // Creator overrides on top of the body's preset — per-axis shape, motion
+  // and material. See `TUNING_RANGES` in `shared/kwami/appearance.ts`.
+  tuning: { amplitude: 0.28, spikeY: 2.4, shininess: 120 },
 })
 
 handle.setAudioLevel(0.4) // call at 60fps; it smooths internally
 handle.setArousal(0.9)
+handle.setSkin('chrome') // recompiles one program; does not remount
 handle.dispose()
 ```
+
+Reading a stored Kwami back is one call rather than three — `lookFor(kwami)` in `app/utils/format.ts` resolves the palette, the skin and the tuning together, with the fallbacks each of them needs.
 
 It returns a handle rather than a reactive object on purpose: audio level updates ~50 times a second, and pushing that through Vue's reactivity would schedule a component update per frame for a value only the GPU ever reads.
