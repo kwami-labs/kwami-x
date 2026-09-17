@@ -103,6 +103,22 @@ export default defineNuxtConfig({
      */
     esbuild: { options: { target: 'es2020' } },
     /**
+     * Inline the `@noble/*` packages instead of leaving them external.
+     *
+     * `@solana/web3.js` pins these at v1 and gets its own nested copies,
+     * because the top level is on v2 — which renamed every export
+     * (`./ed25519` became `./ed25519.js`). Externalising writes the bare v1
+     * specifier into `.output/server/chunks/`, outside web3.js's directory, so
+     * at runtime it resolves against the hoisted v2 and dies on the first
+     * request with `Cannot find module '@noble/curves/ed25519'` — then
+     * `@noble/hashes/sha256` behind it.
+     *
+     * The build succeeds either way and no test catches it: it is a resolution
+     * failure at request time, in the bundle only. Inlining pins the nested v1
+     * into the chunk that actually uses it.
+     */
+    externals: { inline: ['@noble/curves', '@noble/hashes'] },
+    /**
      * Bundle `docs/` into the server build.
      *
      * The docs route reads markdown at request time. Reading it from

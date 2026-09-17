@@ -48,6 +48,26 @@ export const useWalletStore = defineStore('wallet', () => {
   let connection: Connection | null = null
   /** The provider we have already subscribed to — rebinding would stack listeners. */
   let eventsBoundTo: PhantomProvider | null = null
+  /** The detection wait currently in flight, if any. */
+  let detecting: Promise<PhantomProvider | null> | null = null
+
+  /**
+   * Wait for Phantom, joining the wait already running rather than starting a
+   * second one.
+   *
+   * `autoConnect` begins a three-second wait on mount. Someone who pressed
+   * Connect during it used to start their own, so a browser with no Phantom
+   * took up to six seconds to say anything at all — two waits back to back,
+   * the second one for an answer the first had already gone to fetch.
+   */
+  function detectPhantom(): Promise<PhantomProvider | null> {
+    detecting ??= waitForPhantom().finally(() => {
+      // Cleared on settle: a null result means "not yet", not "never", and
+      // Phantom can still inject afterwards.
+      detecting = null
+    })
+    return detecting
+  }
 
   function rpc(): Connection {
     connection ??= new Connection(config.public.solanaRpcUrl as string, 'confirmed')
@@ -104,7 +124,13 @@ export const useWalletStore = defineStore('wallet', () => {
       return
     }
     status.value = 'unavailable'
-    error.value = 'Phantom is not installed. We opened its download page in a new tab.'
+    // Say where to get it rather than assert what just happened. `noopener`
+    // makes `window.open` return null by spec, so a blocked popup is
+    // indistinguishable from a successful one — and it genuinely can be
+    // blocked: the slow path above spends up to three seconds waiting for a
+    // late injection, and the click's user activation does not survive that.
+    // Claiming a tab that is not there sends someone hunting through windows.
+    error.value = `Phantom is not installed. Get it at ${PHANTOM_INSTALL_URL}, then reload this page.`
     window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener')
   }
 
@@ -123,7 +149,7 @@ export const useWalletStore = defineStore('wallet', () => {
       // Show the wait — it can run the full three seconds, and a button that
       // looks inert for three seconds gets pressed again.
       status.value = 'connecting'
-      p = await waitForPhantom()
+      p = await detectPhantom()
       // Borrowed, not owned: `connect` sets it again on the next line, and
       // `signIn` can throw without ever reaching a status of its own — which
       // would leave every button on the page stuck on "Connecting…".
@@ -145,7 +171,7 @@ export const useWalletStore = defineStore('wallet', () => {
    * which is the normal first-visit path, not an error worth surfacing.
    */
   async function autoConnect() {
-    const p = await waitForPhantom()
+    const p = await detectPhantom()
     if (!p) {
       status.value = 'unavailable'
       // Phantom can still land after the wait gives up. Without this the
