@@ -15,10 +15,17 @@ export type Asset = 'SOL' | 'USDC'
  * ```
  * Draft ──mint──▶ Minted ──publish──▶ Live ⇄ Paused
  *                                      │
- *                        cracked ──────┤────── starved
+ *                                      ├──▶ Starving ──top up──▶ Live
+ *                                      │
+ *                                   cracked
  *                                      ▼
  *                                     Dead
  * ```
+ *
+ * `starving` is the one transition here that runs backwards. Every other edge
+ * is paid for on chain and irreversible; running out of energy is neither, so
+ * `withEnergyState` moves a Kwami into it and back out again as the balance
+ * crosses zero.
  */
 export type KwamiState =
   /** Metadata authored, not yet on chain. */
@@ -29,6 +36,12 @@ export type KwamiState =
   | 'live'
   /** Owner temporarily stopped new sessions; existing ones finish. */
   | 'paused'
+  /**
+   * Out of energy: it cannot answer, so it is unlisted and sells no tickets.
+   * Reversible — a top-up puts it straight back to `live`. Nothing is lost, and
+   * in particular the pot is untouched.
+   */
+  | 'starving'
   /** Secret was revealed on chain (commit-reveal win). No longer playable. */
   | 'cracked'
   /** Vault fell below the death threshold. Permanently retired. */
@@ -88,7 +101,7 @@ export interface KwamiOffChain {
   tagline: string
   /** Personality prompt fragment fed to the voice agent. */
   persona: string
-  /** Renderer id from the `kwami` 3D library. */
+  /** Renderer id from the `kwami` 3D library — the body, not the surface. */
   renderer: KwamiRenderer
   /** Renderer tuning (colours, geometry, motion). */
   appearance: Record<string, unknown>
@@ -102,14 +115,24 @@ export interface KwamiOffChain {
 
 export type KwamiRenderer = 'blob-xyz' | 'crystal-ball' | 'orbital-shards' | 'stars-genesis' | 'black-hole'
 
-export interface KwamiVoiceConfig {
-  llmModel: string
-  ttsVoice: string
-  sttModel: string
-  language: string
-  /** How hard the Kwami defends its secret: 0 = chatty, 1 = adversarial. */
-  guardStrength: number
-}
+/**
+ * The surface a Kwami's body wears.
+ *
+ * Re-exported rather than redeclared: the list is twenty-two long and the mint
+ * endpoint, the shader assembler and the studio gallery all read it, which is
+ * three places for a second copy to fall out of step with the first.
+ */
+export type { KwamiSkin } from '../kwami/skins'
+
+/**
+ * Voice configuration, as it is actually stored.
+ *
+ * Re-exported from `shared/kwami/voice.ts` rather than redeclared. It was
+ * redeclared once, as `{ llmModel, ttsVoice, sttModel }`, and drifted: nothing
+ * ever wrote those three fields, so the type described a shape that existed
+ * nowhere while the real one lived in another file under another name.
+ */
+export type { KwamiVoiceConfigStored as KwamiVoiceConfig } from '../kwami/voice'
 
 /** A Kwami as the UI sees it: on-chain truth + off-chain presentation + live balances. */
 export interface Kwami extends KwamiOffChain {

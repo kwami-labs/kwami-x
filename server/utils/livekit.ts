@@ -21,6 +21,28 @@ export interface TokenGrant {
   canPublish?: boolean
   canSubscribe?: boolean
   ttlSeconds?: number
+  /**
+   * The named agent to dispatch into this room.
+   *
+   * A named agent — `kwami-agent` registers itself as one — joins nothing on
+   * its own. It has to be asked, and asking it through the token is how the
+   * room and the worker are introduced without this server holding a
+   * connection open to LiveKit's dispatch API.
+   *
+   * Omit it and no agent is dispatched, which is the correct behaviour for a
+   * deployment that has LiveKit keys but no worker running.
+   */
+  agentName?: string
+  /**
+   * What the agent is told about the room, in one string.
+   *
+   * An identifier, never the Kwami's secret. This claim is inside a JWT that is
+   * handed to the player, who can decode their own token — a secret here would
+   * be a secret published to the one person the game exists to keep it from.
+   * The agent trades this identifier for the real configuration over
+   * `/api/internal/kwamis/:id/runtime`, which is authenticated and server-to-server.
+   */
+  agentMetadata?: string
 }
 
 function base64url(input: Buffer | string): string {
@@ -48,7 +70,7 @@ export function createLiveKitToken(grant: TokenGrant): string {
 
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'HS256', typ: 'JWT' }
-  const payload = {
+  const payload: Record<string, unknown> = {
     iss: apiKey,
     sub: grant.identity,
     name: grant.name ?? grant.identity,
@@ -66,9 +88,46 @@ export function createLiveKitToken(grant: TokenGrant): string {
     },
   }
 
+  // Field names are the JSON encoding of LiveKit's `RoomConfiguration`
+  // protobuf, which is what `livekit-server-sdk` emits for the same claim and
+  // what `kwami-lk-api` builds through `RoomAgentDispatch`. camelCase, not the
+  // snake_case of the .proto.
+  if (grant.agentName) {
+    payload.roomConfig = {
+      agents: [{ agentName: grant.agentName, metadata: grant.agentMetadata ?? '' }],
+      // How long the room outlives the people in it.
+      //
+      // This is not tuning, it is the difference between a Kwami that answers
+      // and one that never speaks. LiveKit dispatches the agents named above
+      // when the room is *created*, and ignores the claim for a room that
+      // already exists — so a room that lingers after everyone has gone is a
+      // room the next connection joins with no worker in it and no way to ask
+      // for one. At LiveKit's defaults (300s empty, 20s departure) that is
+      // every rehearsal for five minutes after the first.
+      //
+      // Short enough that the room is gone before anyone comes back, long
+      // enough to survive the reconnect LiveKit does on a network blip, which
+      // does not count as leaving.
+      emptyTimeout: 60,
+      departureTimeout: 10,
+    }
+  }
+
   const signingInput = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(payload))}`
   const signature = createHmac('sha256', apiSecret).update(signingInput).digest('base64url')
   return `${signingInput}.${signature}`
+}
+
+/**
+ * The worker to dispatch, or empty for none.
+ *
+ * Empty is a supported deployment and not a misconfiguration: LiveKit keys with
+ * no worker running gives a room the player can speak into and nothing that
+ * answers, which is worse than the browser path. An operator turns the agent on
+ * by naming it.
+ */
+export function livekitAgentName(): string {
+  return (useRuntimeConfig().livekitAgentName as string) || ''
 }
 
 /** Whether the LiveKit voice path is available, so the client can pick a transport. */

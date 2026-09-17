@@ -85,6 +85,18 @@ describe('validateSiwsMessage', () => {
     expect(result.reason).toMatch(/domain/i)
   })
 
+  it('accepts any of several expected domains', () => {
+    expect(
+      validateSiwsMessage(BASE, { ...ctx, expectedDomain: ['localhost:3000', 'x.kwami.io'] }).valid,
+    ).toBe(true)
+  })
+
+  it('rejects a chain id that does not match the deployment cluster', () => {
+    const result = validateSiwsMessage(BASE, { ...ctx, expectedChainId: 'mainnet' })
+    expect(result.valid).toBe(false)
+    expect(result.reason).toMatch(/chain id/i)
+  })
+
   it('rejects a nonce that was not the one issued', () => {
     expect(validateSiwsMessage(BASE, { ...ctx, expectedNonce: 'different' }).valid).toBe(false)
   })

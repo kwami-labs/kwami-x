@@ -39,8 +39,10 @@
     if (el.getAttribute('data-interactive') === 'off') params.push('interactive=off')
     var colorA = el.getAttribute('data-color-a')
     var colorB = el.getAttribute('data-color-b')
+    var colorC = el.getAttribute('data-color-c')
     if (colorA) params.push('colorA=' + encodeURIComponent(colorA.replace('#', '')))
     if (colorB) params.push('colorB=' + encodeURIComponent(colorB.replace('#', '')))
+    if (colorC) params.push('colorC=' + encodeURIComponent(colorC.replace('#', '')))
 
     var frame = document.createElement('iframe')
     frame.src = ORIGIN + '/embed/' + encodeURIComponent(mint) + (params.length ? '?' + params.join('&') : '')

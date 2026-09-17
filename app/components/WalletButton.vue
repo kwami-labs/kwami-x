@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PHANTOM_INSTALL_URL } from '~/utils/phantom'
-
 const wallet = useWalletStore()
 const auth = useAuthStore()
 const gate = useAuthGate()
@@ -14,10 +12,8 @@ onClickOutside(menu, () => (open.value = false))
 const bound = computed(() => Boolean(wallet.address && auth.boundAddresses.includes(wallet.address)))
 
 async function onConnect() {
-  if (wallet.status === 'unavailable') {
-    window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener')
-    return
-  }
+  // `connect()` owns the "no Phantom here" case — install page on desktop,
+  // universal link on a phone — so every button on the site behaves the same.
   await wallet.connect()
   // Connecting is a browser-level grant; it proves nothing to the server. Ask
   // for the signature straight after, while the user is still in the flow they
@@ -85,6 +81,7 @@ async function onSignOut() {
 
         <div class="stack gap-1">
           <NuxtLink to="/me" class="popover__item" @click="open = false">My Kwamis</NuxtLink>
+          <NuxtLink to="/me/profile" class="popover__item" @click="open = false">Account</NuxtLink>
           <NuxtLink to="/me/sessions" class="popover__item" @click="open = false">Session history</NuxtLink>
           <button class="popover__item" @click="wallet.refreshBalances()">Refresh balance</button>
           <NuxtLink to="/onramp" class="popover__item popover__item--gold" @click="open = false">
@@ -98,7 +95,11 @@ async function onSignOut() {
       </div>
     </div>
 
-    <p v-if="wallet.error" class="error-text wallet__error">{{ wallet.error }}</p>
+    <!-- Click to dismiss: it floats over the page, and nothing else clears it
+         until the next connection attempt. -->
+    <p v-if="wallet.error" class="error-text wallet__error" @click="wallet.error = null">
+      {{ wallet.error }}
+    </p>
   </div>
 </template>
 
@@ -158,5 +159,13 @@ async function onSignOut() {
   top: calc(100% + 8px);
   width: max-content;
   max-width: 260px;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  /* It sits on top of the page, so it needs its own ground to be readable. */
+  background: var(--bg-raised);
+  border: 1px solid rgba(255, 92, 114, 0.32);
+  box-shadow: var(--shadow-lift);
+  cursor: pointer;
+  z-index: 60;
 }
 </style>

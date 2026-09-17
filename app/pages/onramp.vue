@@ -46,7 +46,7 @@ async function openWidget() {
 
     <div v-if="!wallet.isConnected" class="card stack gap-2">
       <p class="muted">Connect your wallet so MoonPay knows where to send it.</p>
-      <button class="btn btn--primary" @click="wallet.connect()">Connect Phantom</button>
+      <ConnectWallet />
     </div>
 
     <div v-else-if="!auth.isSignedIn" class="card stack gap-2">
