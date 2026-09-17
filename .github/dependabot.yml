@@ -37,10 +37,24 @@ updates:
       testing:
         patterns: ['vitest', '@vitest/*', 'happy-dom', '@vue/test-utils']
       release-tooling:
-        patterns: ['semantic-release', '@semantic-release/*', '@commitlint/*', 'husky', 'lint-staged']
+        patterns:
+          [
+            'semantic-release',
+            '@semantic-release/*',
+            '@commitlint/*',
+            'husky',
+            'lint-staged',
+            'conventional-changelog-conventionalcommits',
+          ]
       minor-and-patch:
         patterns: ['*']
         update-types: [minor, patch]
+    # semantic-release 25 still ships conventional-changelog-writer@8. Preset 10 requires
+    # writer 9 and blows up generateNotes — pin stays on the 9.x line until the generator
+    # upgrades (https://github.com/semantic-release/release-notes-generator/issues/1027).
+    ignore:
+      - dependency-name: conventional-changelog-conventionalcommits
+        update-types: ['version-update:semver-major']
 
   # The vault program. An anchor-lang bump changes the code that custodies user funds, so it
   # gets the `program` scope that .releaserc.cjs always releases on.
