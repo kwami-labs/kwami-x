@@ -11,6 +11,7 @@ import { computed, ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { PublicKey } from '@solana/web3.js'
 import { PHANTOM_INSTALL_URL } from '~/utils/phantom'
+import { parseSiwsMessage, validateSiwsMessage } from '#shared/auth/siws'
 
 // `connect` refreshes balances on success. The RPC is not what is under test,
 // and a real socket attempt prints ECONNREFUSED over the whole run.
@@ -153,6 +154,27 @@ describe('connect', () => {
     vi.useRealTimers()
   })
 
+  it('joins the wait already running instead of starting a second one', async () => {
+    vi.useFakeTimers()
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wallet = useWalletStore()
+
+    const mounting = wallet.autoConnect()
+    await vi.advanceTimersByTimeAsync(500)
+    // Pressed Connect while the mount-time wait still has 2.5s to run.
+    const clicking = wallet.connect()
+    await vi.advanceTimersByTimeAsync(2700)
+
+    // Two waits back to back would put this answer at 3500ms. It is here at
+    // 3200ms because the click joined the wait already in flight.
+    expect(open).toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(2000)
+    await mounting
+    await clicking
+    vi.useRealTimers()
+  })
+
   it('reopens the page inside Phantom on a phone instead of pushing a download', async () => {
     // The extension cannot exist in a phone browser, so the install page is the
     // one thing that is guaranteed useless there.
@@ -245,5 +267,52 @@ describe('signIn', () => {
     expect(wallet.status).not.toBe('connecting')
     nav.restore()
     vi.useRealTimers()
+  })
+
+  it('falls back to connect + signMessage in a form the server accepts', async () => {
+    const nav = captureNavigation()
+    const provider = fakeProvider() // no `signIn` — not every wallet has SIWS
+    ;(window as Record<string, unknown>).phantom = { solana: provider }
+    const wallet = useWalletStore()
+    wallet.status = 'unavailable'
+
+    const out = await wallet.signIn('nonce-abc')
+
+    expect(provider.signMessage).toHaveBeenCalled()
+    expect(out.address).toBe(KEY.toBase58())
+
+    // The whole point of building the message ourselves is that the server
+    // verifies both paths identically, so assert against the server's own
+    // parser rather than a substring that could drift out of spec unnoticed.
+    const parsed = parseSiwsMessage(out.message)
+    expect(parsed).not.toBeNull()
+    expect(
+      validateSiwsMessage(parsed!, {
+        expectedDomain: 'x.kwami.io',
+        expectedNonce: 'nonce-abc',
+        expectedAddress: KEY.toBase58(),
+        expectedChainId: 'devnet',
+      }),
+    ).toMatchObject({ valid: true })
+    nav.restore()
+  })
+
+  it('falls through to signMessage when an older build mishandles signIn', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const nav = captureNavigation()
+    const provider = fakeProvider()
+    // Advertises SIWS but rejects our input. A dismissal must still surface;
+    // anything else has to leave a way in rather than locking the user out.
+    provider.signIn = vi.fn().mockRejectedValue(new Error('unsupported input'))
+    ;(window as Record<string, unknown>).phantom = { solana: provider }
+    const wallet = useWalletStore()
+    wallet.status = 'unavailable'
+
+    const out = await wallet.signIn('nonce-xyz')
+
+    expect(provider.signIn).toHaveBeenCalled()
+    expect(provider.signMessage).toHaveBeenCalled()
+    expect(parseSiwsMessage(out.message)?.nonce).toBe('nonce-xyz')
+    nav.restore()
   })
 })
