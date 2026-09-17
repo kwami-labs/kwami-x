@@ -54,6 +54,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # semantic-release runs `git tag --merged <branch>` for every name in `.releaserc.cjs`.
+      # A single-ref checkout only has the branch it built, so `git tag --merged main` dies
+      # with `fatal: malformed object name main` on `dev`/`stg` (and sometimes on `main` too
+      # when checkout leaves a detached HEAD).
+      - name: Materialise channel branches for semantic-release
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --tags
+          for branch in main stg dev; do
+            if git rev-parse --verify "refs/heads/${branch}" >/dev/null 2>&1; then
+              continue
+            fi
+            git rev-parse --verify "refs/remotes/origin/${branch}" >/dev/null
+            git branch --track "${branch}" "origin/${branch}"
+          done
+          git branch --list 'main' 'stg' 'dev'
+
       - name: Authenticate git for the release and back-merge pushes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
