@@ -2,6 +2,11 @@
 members = ["kwami-vault"]
 resolver = "2"
 
+# GHSA-cq8v-f236-94qc: solana-secp256k1-recover 2.2.1 requires libsecp256k1 ^0.6,
+# which pulls rand 0.7.3. The vendor is 0.6.0 with that pin lifted to rand 0.8.
+[patch.crates-io]
+libsecp256k1 = { path = "vendor/libsecp256k1" }
+
 [profile.release]
 overflow-checks = true
 lto = "fat"
