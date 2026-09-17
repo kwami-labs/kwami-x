@@ -29,19 +29,17 @@
 //! resolution mode and the extension program. What moves is the pot, the
 //! counters, the lifecycle state and — on a marketplace sale — the owner.
 
-// Anchor's `#[program]` macro expands to a call to the deprecated `AccountInfo::realloc`, and
-// `anchor_lang::solana_program::system_instruction` is deprecated in favour of a crate
-// anchor-lang 0.31 does not itself depend on yet. Neither is fixable from this source, and
-// `clippy -D warnings` is worth keeping as a real gate rather than softening it — so allow
-// exactly this lint, and nothing else. Revisit when anchor-lang moves off both.
+// Anchor's `#[program]` macro still expands to the deprecated `AccountInfo::realloc`.
+// `clippy -D warnings` is worth keeping as a real gate, so allow exactly that lint.
 #![allow(deprecated)]
 
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
 use anchor_lang::solana_program::program::{invoke, invoke_signed};
 use anchor_lang::solana_program::system_instruction;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use solana_instructions_sysvar::ID as INSTRUCTIONS_ID;
+use solana_sha256_hasher::hash;
 
 pub mod attestation;
 pub mod errors;
@@ -564,7 +562,7 @@ pub mod kwami_vault {
         let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &[vault_bump]];
         token_interface::transfer_checked(
             CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.token_program.key(),
                 TransferChecked {
                     from: ctx.accounts.vault_usdc.to_account_info(),
                     mint: ctx.accounts.usdc_mint.to_account_info(),
@@ -659,7 +657,7 @@ fn transfer_spl<'info>(
     }
     token_interface::transfer_checked(
         CpiContext::new(
-            token_program.to_account_info(),
+            token_program.key(),
             TransferChecked {
                 from: from.to_account_info(),
                 mint: mint.to_account_info(),
@@ -806,7 +804,7 @@ fn settle_win<'info>(
             let seeds: &[&[u8]] = &[b"vault", mint_key.as_ref(), &bump];
             token_interface::transfer_checked(
                 CpiContext::new_with_signer(
-                    leg.token_program.clone(),
+                    *leg.token_program.key,
                     TransferChecked {
                         from: leg.vault_ata.clone(),
                         mint: leg.mint.clone(),
@@ -1065,7 +1063,7 @@ impl<'info> ClaimWin<'info> {
 pub struct ClaimWinAttested<'info> {
     pub inner: ClaimWin<'info>,
     /// CHECK: address-checked against the instructions sysvar.
-    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    #[account(address = INSTRUCTIONS_ID)]
     pub instructions_sysvar: UncheckedAccount<'info>,
 }
 
