@@ -1,9 +1,7 @@
 use crate::errors::KwamiError;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::ed25519_program;
-use anchor_lang::solana_program::sysvar::instructions::{
-    load_current_index_checked, load_instruction_at_checked,
-};
+use solana_instructions_sysvar::{load_current_index_checked, load_instruction_at_checked};
+use solana_sdk_ids::ed25519_program;
 
 /// What the oracle signs to certify a win in `Attested` mode.
 ///
