@@ -133,6 +133,26 @@ describe('connect', () => {
     expect(wallet.error).toMatch(/locked/i)
   })
 
+  it('does not claim a tab it cannot know it opened', async () => {
+    // Clicking before the mount-time wait has concluded takes the slow path,
+    // which spends three seconds before it gives up. User activation does not
+    // survive that, so the install tab may well be blocked — and `noopener`
+    // makes `window.open` return null either way, so the message must not
+    // describe what happened. It has to carry the URL instead.
+    vi.useFakeTimers()
+    vi.spyOn(window, 'open').mockReturnValue(null)
+    const wallet = useWalletStore()
+    expect(wallet.status).toBe('disconnected')
+
+    const pending = wallet.connect()
+    await vi.advanceTimersByTimeAsync(3100)
+    await pending
+
+    expect(wallet.error).toContain(PHANTOM_INSTALL_URL)
+    expect(wallet.error).not.toMatch(/we opened|new tab/i)
+    vi.useRealTimers()
+  })
+
   it('reopens the page inside Phantom on a phone instead of pushing a download', async () => {
     // The extension cannot exist in a phone browser, so the install page is the
     // one thing that is guaranteed useless there.

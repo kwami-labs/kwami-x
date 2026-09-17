@@ -104,7 +104,13 @@ export const useWalletStore = defineStore('wallet', () => {
       return
     }
     status.value = 'unavailable'
-    error.value = 'Phantom is not installed. We opened its download page in a new tab.'
+    // Say where to get it rather than assert what just happened. `noopener`
+    // makes `window.open` return null by spec, so a blocked popup is
+    // indistinguishable from a successful one — and it genuinely can be
+    // blocked: the slow path above spends up to three seconds waiting for a
+    // late injection, and the click's user activation does not survive that.
+    // Claiming a tab that is not there sends someone hunting through windows.
+    error.value = `Phantom is not installed. Get it at ${PHANTOM_INSTALL_URL}, then reload this page.`
     window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener')
   }
 
