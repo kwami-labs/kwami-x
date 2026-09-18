@@ -1,4 +1,4 @@
-import { matchSecret, normalizePhrase, words } from '#shared/game/secret'
+import { matchSecret, words } from '#shared/game/secret'
 import { gameById } from '#shared/kwami/voice'
 import { buildKwamiPrompt } from '#shared/kwami/prompt'
 import { BRAIN_MODEL } from '#shared/kwami/agent-config'
@@ -167,7 +167,9 @@ export function respondScripted(input: BrainInput): string {
     return 'One of those words has been in this room before. I will not say which.'
   }
 
-  if (normalizePhrase(input.utterance).endsWith('?')) {
+  // Checked on the raw utterance: `normalizePhrase` strips punctuation, so
+  // looking at the normalised form would make this branch dead.
+  if (input.utterance.trimEnd().endsWith('?')) {
     return pick(DEFLECTIONS, input.history.length + 1)
   }
 

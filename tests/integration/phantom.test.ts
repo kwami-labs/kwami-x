@@ -10,6 +10,7 @@ import {
   waitForPhantom,
 } from '~/utils/phantom'
 import { PublicKey } from '@solana/web3.js'
+import bs58 from 'bs58'
 
 describe('provider detection', () => {
   beforeEach(() => {
@@ -35,6 +36,16 @@ describe('provider detection', () => {
   it('reports nothing when no wallet is present', () => {
     expect(getPhantomProvider()).toBeNull()
     expect(isPhantomInstalled()).toBe(false)
+  })
+
+  it('reports nothing when there is no window, which is the SSR path', () => {
+    const win = globalThis.window
+    vi.stubGlobal('window', undefined)
+    try {
+      expect(getPhantomProvider()).toBeNull()
+    } finally {
+      vi.stubGlobal('window', win)
+    }
   })
 })
 
@@ -74,6 +85,33 @@ describe('normalizeSignInOutput', () => {
     expect(out.signature).toEqual(signature)
   })
 
+  it('decodes a signed message that arrived as a byte array rather than a Uint8Array', () => {
+    const out = normalizeSignInOutput({
+      address: key.toBase58(),
+      signedMessage: Array.from(new TextEncoder().encode(message)) as unknown as Uint8Array,
+      signature,
+    })
+    expect(out.message).toBe(message)
+  })
+
+  it('derives the address from a raw public key when the string is missing', () => {
+    const out = normalizeSignInOutput({
+      account: { publicKey: key.toBytes() },
+      signedMessage: message,
+      signature,
+    })
+    expect(out.address).toBe(key.toBase58())
+  })
+
+  it('accepts a base58 signature string', () => {
+    const out = normalizeSignInOutput({
+      address: key.toBase58(),
+      signedMessage: message,
+      signature: bs58.encode(signature),
+    })
+    expect(out.signature).toEqual(signature)
+  })
+
   it('throws when Phantom returns nothing usable', () => {
     expect(() =>
       normalizeSignInOutput({
@@ -81,6 +119,16 @@ describe('normalizeSignInOutput', () => {
         signature,
       }),
     ).toThrow(/no address/i)
+  })
+
+  it('throws when the signature is a shape it does not know', () => {
+    expect(() =>
+      normalizeSignInOutput({
+        address: key.toBase58(),
+        signedMessage: message,
+        signature: { r: 1 } as never,
+      }),
+    ).toThrow(/no signature/i)
   })
 })
 
@@ -107,6 +155,23 @@ describe('waitForPhantom', () => {
   it('gives up after the timeout rather than hanging', async () => {
     await expect(waitForPhantom(60)).resolves.toBeNull()
   })
+
+  it('picks up the initialized event', async () => {
+    const pending = waitForPhantom(1000)
+    ;(window as Record<string, unknown>).phantom = { solana: { isPhantom: true } }
+    window.dispatchEvent(new Event('phantom#initialized'))
+    await expect(pending).resolves.not.toBeNull()
+  })
+
+  it('resolves null without a window rather than waiting for one', async () => {
+    const win = globalThis.window
+    vi.stubGlobal('window', undefined)
+    try {
+      await expect(waitForPhantom(10)).resolves.toBeNull()
+    } finally {
+      vi.stubGlobal('window', win)
+    }
+  })
 })
 
 describe('error interpretation', () => {
@@ -125,6 +190,7 @@ describe('error interpretation', () => {
     expect(describeWalletError({ code: 4001 })).toMatch(/dismissed/i)
     expect(describeWalletError({ code: 4900 })).toMatch(/locked/i)
     expect(describeWalletError({ code: 4100 })).toMatch(/authorised|connect/i)
+    expect(describeWalletError({ code: 4100 }, 'connect')).toMatch(/unlocked|authorise/i)
     expect(describeWalletError({ code: -32603 })).toMatch(/simulation|process/i)
   })
 
@@ -173,8 +239,16 @@ describe('mobile', () => {
     set('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)')
     expect(isMobileBrowser()).toBe(true)
 
+    set('Mozilla/5.0 (Linux; Android 14)')
+    expect(isMobileBrowser()).toBe(true)
+
     set('Mozilla/5.0 (X11; Linux x86_64)')
     expect(isMobileBrowser()).toBe(false)
+
+    const nav = globalThis.navigator
+    vi.stubGlobal('navigator', undefined)
+    expect(isMobileBrowser()).toBe(false)
+    vi.stubGlobal('navigator', nav)
 
     set(original)
   })

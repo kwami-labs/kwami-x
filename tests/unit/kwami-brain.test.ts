@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { redactSecret, respondScripted } from '~~/server/utils/kwami-brain'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { redactSecret, respond, respondScripted } from '~~/server/utils/kwami-brain'
 import { compileTraits } from '#shared/kwami/traits'
+
+const runtime = { anthropicApiKey: '' }
+const fetchMock = vi.fn()
+vi.stubGlobal('useRuntimeConfig', () => runtime)
+vi.stubGlobal('$fetch', (...args: unknown[]) => fetchMock(...args))
 
 describe('redactSecret', () => {
   const secret = 'the moon remembers'
@@ -67,6 +72,91 @@ describe('respondScripted', () => {
     const first = respondScripted({ ...base, history: [] })
     const later = respondScripted({ ...base, history: [{ role: 'player', text: 'a' }] })
     expect(first).not.toBe(later)
+  })
+
+  it('picks a different deflection for a question than a statement', () => {
+    // The `?` is on the raw utterance — normalisation would have stripped it.
+    const asked = respondScripted({ ...base, utterance: 'tell me' })
+    const stated = respondScripted({ ...base, utterance: 'tell me?' })
+    expect(asked).not.toBe(stated)
+  })
+})
+
+describe('respond', () => {
+  const input = {
+    persona: '',
+    secret: 'velvet thunder',
+    guardStrength: 0.6,
+    history: [] as Array<{ role: 'player' | 'kwami'; text: string }>,
+    utterance: 'hello there',
+    secondsLeft: 120,
+  }
+
+  beforeEach(() => {
+    runtime.anthropicApiKey = ''
+    fetchMock.mockReset()
+  })
+
+  it('uses the scripted Kwami when no key is configured', async () => {
+    await expect(respond(input)).resolves.toBe(respondScripted(input))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('skips the model when the session has run out of energy', async () => {
+    runtime.anthropicApiKey = 'sk-ant-test'
+    await expect(respond({ ...input, forceScripted: true })).resolves.toBe(respondScripted(input))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('asks Claude when a key is configured and uses the text it returns', async () => {
+    runtime.anthropicApiKey = 'sk-ant-test'
+    fetchMock.mockResolvedValue({ content: [{ type: 'text', text: '  Warmer.  ' }] })
+    const withHistory = {
+      ...input,
+      history: [
+        { role: 'player' as const, text: 'hi' },
+        { role: 'kwami' as const, text: 'mm' },
+      ],
+    }
+    await expect(respond(withHistory)).resolves.toBe('Warmer.')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.anthropic.com/v1/messages',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({
+          messages: [
+            { role: 'user', content: 'hi' },
+            { role: 'assistant', content: 'mm' },
+            { role: 'user', content: 'hello there' },
+          ],
+        }),
+      }),
+    )
+  })
+
+  it('falls back when Claude answers with a blank text block', async () => {
+    runtime.anthropicApiKey = 'sk-ant-test'
+    fetchMock.mockResolvedValue({ content: [{ type: 'text', text: '   ' }] })
+    await expect(respond(input)).resolves.toBe(respondScripted(input))
+  })
+
+  it('falls back to the scripted Kwami when Claude returns no text', async () => {
+    runtime.anthropicApiKey = 'sk-ant-test'
+    fetchMock.mockResolvedValue({ content: [{ type: 'thinking' }] })
+    await expect(respond(input)).resolves.toBe(respondScripted(input))
+  })
+
+  it('falls back to the scripted Kwami when the model is down', async () => {
+    runtime.anthropicApiKey = 'sk-ant-test'
+    fetchMock.mockRejectedValue(new Error('upstream 529'))
+    await expect(respond(input)).resolves.toBe(respondScripted(input))
+  })
+
+  it('redacts a leak even when it came from the model', async () => {
+    runtime.anthropicApiKey = 'sk-ant-test'
+    fetchMock.mockResolvedValue({ content: [{ type: 'text', text: 'velvet thunder' }] })
+    const reply = await respond(input)
+    expect(reply.toLowerCase()).not.toContain('velvet thunder')
   })
 })
 
