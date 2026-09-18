@@ -2,12 +2,13 @@ import { defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Two projects, deliberately split.
+ * Three projects, deliberately split.
  *
  * The `unit` project runs the pure domain modules in plain Node with no Nuxt
  * involvement — fast enough to keep in watch mode while editing game rules.
  * The `integration` project uses happy-dom for anything that touches
- * components, composables or auto-imports.
+ * components, composables or auto-imports. `performance` is the budget check
+ * for hardware consume, payload size and UI load/render.
  */
 export default defineConfig({
   resolve: {
@@ -37,6 +38,18 @@ export default defineConfig({
           name: 'integration',
           environment: 'happy-dom',
           include: ['tests/integration/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'performance',
+          environment: 'happy-dom',
+          include: ['tests/performance/**/*.test.ts'],
+          testTimeout: 30_000,
+          // The evaluation test writes the report to stdout. Intercepting it
+          // would hide the one thing this project exists to show.
+          disableConsoleIntercept: true,
         },
       },
     ],
