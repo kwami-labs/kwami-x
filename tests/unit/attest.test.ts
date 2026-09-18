@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Keypair, PublicKey } from '@solana/web3.js'
 import nacl from 'tweetnacl'
-import { attestationMessage } from '~~/server/utils/attest'
+import bs58 from 'bs58'
+
+const oracle = Keypair.generate()
+vi.mock('~~/server/utils/solana', () => ({
+  oracleKeypair: () => oracle,
+}))
+
+const { attestationMessage, signWinAttestation, ATTESTATION_TTL_SECS } =
+  await import('~~/server/utils/attest')
 
 const SESSION = new PublicKey('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU')
 const PLAYER = new PublicKey('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM')
@@ -49,6 +57,26 @@ describe('attestationMessage', () => {
 
   it('rejects a malformed address rather than signing over garbage', () => {
     expect(() => attestationMessage('not-an-address', PLAYER.toBase58(), VALID_UNTIL)).toThrow()
+  })
+
+  it('signWinAttestation is a real signature over those bytes, with a 5-minute deadline', async () => {
+    const now = 1_800_000_000
+    const signed = await signWinAttestation(SESSION.toBase58(), PLAYER.toBase58(), now)
+
+    expect(signed.validUntil).toBe(now + ATTESTATION_TTL_SECS)
+    expect(signed.oracle).toBe(oracle.publicKey.toBase58())
+    expect(
+      nacl.sign.detached.verify(
+        Buffer.from(signed.message, 'base64'),
+        bs58.decode(signed.signature),
+        oracle.publicKey.toBytes(),
+      ),
+    ).toBe(true)
+
+    const implicit = await signWinAttestation(SESSION.toBase58(), PLAYER.toBase58())
+    expect(implicit.validUntil).toBeGreaterThanOrEqual(
+      Math.floor(Date.now() / 1000) + ATTESTATION_TTL_SECS - 1,
+    )
   })
 
   it('produces a signature that verifies under the oracle key', () => {

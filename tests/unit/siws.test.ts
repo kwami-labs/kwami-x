@@ -130,4 +130,19 @@ describe('validateSiwsMessage', () => {
   it('rejects a malformed timestamp instead of treating NaN as fresh', () => {
     expect(validateSiwsMessage({ ...BASE, issuedAt: 'yesterday' }, ctx).valid).toBe(false)
   })
+
+  it('rejects a malformed expiration the same way', () => {
+    expect(validateSiwsMessage({ ...BASE, expirationTime: 'soon' }, ctx).valid).toBe(false)
+  })
+
+  it('accepts an expiration that is still in the future', () => {
+    expect(validateSiwsMessage({ ...BASE, expirationTime: '2026-09-04T12:05:00.000Z' }, ctx).valid).toBe(true)
+  })
+
+  it('reads the clock itself when the caller does not pass one', () => {
+    const fresh = { ...BASE, issuedAt: new Date().toISOString() }
+    expect(validateSiwsMessage(fresh, { expectedDomain: 'x.kwami.io', expectedNonce: 'abc123' }).valid).toBe(
+      true,
+    )
+  })
 })
