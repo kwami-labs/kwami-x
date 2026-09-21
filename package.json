@@ -44,7 +44,7 @@
     "@solana/web3.js": "^1.99.0",
     "@supabase/supabase-js": "^2.116.0",
     "@vueuse/core": "^14.4.0",
-    "@vueuse/nuxt": "^14.4.0",
+    "@vueuse/nuxt": "^15.0.0",
     "bs58": "^6.0.0",
     "livekit-client": "^2.22.3",
     "marked": "^18.0.13",
