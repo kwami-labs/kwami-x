@@ -31,7 +31,7 @@ bun run dev
 
 That is all of it. With no configuration the app runs in **demo mode** — a seeded arena, full 3D, full navigation — so a fresh clone is explorable before any infrastructure exists. Mutating routes return a 503 naming the variable they need, rather than pretending to work.
 
-See **[docs/setup.md](docs/setup.md)** to add Supabase, Solana, voice and the on-ramp, one piece at a time.
+See **[docs/setup.md](docs/setup.md)** to unlock the shared `.env` (git-crypt) and to add Supabase, Solana, voice and the on-ramp, one piece at a time.
 
 ## What is here
 

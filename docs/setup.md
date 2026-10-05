@@ -6,6 +6,16 @@
 - Node 20+ (Nuxt's toolchain still reaches for it in places)
 - Optionally: [Supabase CLI](https://supabase.com/docs/guides/cli), the [Solana toolchain](https://solana.com/docs/intro/installation) and [Anchor](https://www.anchor-lang.com/) 0.31 for the on-chain half
 
+## Shared `.env`
+
+`.env` is in git, encrypted with git-crypt. A fresh clone checks it out as ciphertext, which is not a valid env file and is not demo mode. Install git-crypt and unlock once before `bun run dev`:
+
+```bash
+git-crypt unlock ~/.config/git-crypt/kwami.io/kwami-x.key
+```
+
+The key file stays outside the repo. Plaintext `.env.*` overrides stay gitignored; `.env.example` stays plaintext. After unlock the working tree is plaintext. Without the key, copy `.env.example` over that ciphertext file if you only want demo mode.
+
 ## The two-command version
 
 ```bash

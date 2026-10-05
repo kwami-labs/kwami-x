@@ -3,7 +3,7 @@ node_modules
 .output
 .data
 dist
-.env
+# `.env` is tracked and encrypted with git-crypt. `.env.example` stays plaintext.
 .env.*
 !.env.example
 *.log
