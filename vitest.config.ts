@@ -2,12 +2,13 @@ import { defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Two projects, deliberately split.
+ * Three projects, deliberately split.
  *
  * The `unit` project runs the pure domain modules in plain Node with no Nuxt
  * involvement — fast enough to keep in watch mode while editing game rules.
- * The `nuxt` project boots a Nuxt environment for anything that touches
- * components, composables or auto-imports.
+ * The `integration` project uses happy-dom for anything that touches
+ * components, composables or auto-imports. `performance` is the budget check
+ * for hardware consume, payload size and UI load/render.
  */
 export default defineConfig({
   resolve: {
@@ -37,6 +38,18 @@ export default defineConfig({
           name: 'integration',
           environment: 'happy-dom',
           include: ['tests/integration/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'performance',
+          environment: 'happy-dom',
+          include: ['tests/performance/**/*.test.ts'],
+          testTimeout: 30_000,
+          // The evaluation test writes the report to stdout. Intercepting it
+          // would hide the one thing this project exists to show.
+          disableConsoleIntercept: true,
         },
       },
     ],
@@ -73,25 +86,7 @@ export default defineConfig({
         'app/utils/kwami-field.ts',
         'app/utils/audio-meter.ts',
       ],
-      /**
-       * A RATCHET, not a target. Measured 2026-09-17: 96.0 / 92.8 / 97.1 / 97.1 (statements /
-       * branches / functions / lines), so the floor sits under each — v8 drifts slightly run to
-       * run, and newly added source dilutes the ratio until its tests land.
-       *
-       * Branches is still the thin one and is worth knowing why: the remaining gap is almost
-       * entirely `kwami-brain.ts`'s Claude path, which cannot run without an API key, plus
-       * `attest.ts` and the `siwe` error branches. The floor moved 91 → 92 once the wallet
-       * connect paths were covered; going further would pin the build to those three rather
-       * than to anything a change is likely to break.
-       *
-       * Statements, functions and lines sit six to seven points above their floors. They are
-       * deliberately left there — tightening all four at once turns an unrelated in-flight
-       * branch red for a reason that has nothing to do with it.
-       *
-       * Raise it after a clean `bun run test:coverage`. Never lower it to make a red build
-       * pass; that is the one move that turns a ratchet back into a suggestion.
-       */
-      thresholds: { lines: 90, functions: 91, branches: 92, statements: 90 },
+      thresholds: { lines: 100, functions: 100, branches: 100, statements: 100 },
     },
   },
 })

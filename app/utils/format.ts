@@ -65,12 +65,8 @@ export function relativeTime(iso: string | number | Date): string {
     ['minute', 60],
     ['second', 1],
   ]
-  for (const [unit, secs] of units) {
-    if (Math.abs(deltaSecs) >= secs || unit === 'second') {
-      return rtf.format(Math.round(deltaSecs / secs), unit)
-    }
-  }
-  return 'just now'
+  const [unit, secs] = units.find(([unit, secs]) => Math.abs(deltaSecs) >= secs || unit === 'second')!
+  return rtf.format(Math.round(deltaSecs / secs), unit)
 }
 
 /**

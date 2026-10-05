@@ -33,7 +33,12 @@ describe('buildKwamiPrompt', () => {
 
   it('turns guard strength into an instruction the model can act on', () => {
     expect(buildKwamiPrompt({ ...draft, guardStrength: 0.9 })).toContain('hostile and terse')
+    expect(buildKwamiPrompt({ ...draft, guardStrength: 0.5 })).toContain('playful but careful')
     expect(buildKwamiPrompt({ ...draft, guardStrength: 0.1 })).toContain('talkative and warm')
+  })
+
+  it('fills in a persona when the creator left it blank', () => {
+    expect(buildKwamiPrompt({ ...draft, persona: '' })).toContain('Enigmatic and sparing with words.')
   })
 
   it('compiles the trait sliders into prose', () => {
@@ -85,6 +90,13 @@ describe('agentConfigMessage', () => {
     // Without a kwami id the worker files memory under `kwami_default`, which
     // would pool every creator's drafts together.
     expect(message.memory.enabled).toBe(false)
+    expect(message).not.toHaveProperty('kwamiId')
+  })
+
+  it('names an unnamed draft Kwami, and files a real one under its id', () => {
+    expect(agentConfigMessage({ ...draft, name: '   ' }).kwamiName).toBe('Kwami')
+    expect(agentConfigMessage({ ...draft, name: undefined }).soul.name).toBe('Kwami')
+    expect(agentConfigMessage({ ...draft, kwamiId: 'kw_1' }).kwamiId).toBe('kw_1')
   })
 })
 

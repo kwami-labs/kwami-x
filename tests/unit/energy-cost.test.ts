@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   affordableVoiceSeconds,
+  ceilDiv,
   costOf,
   energyFromLamports,
   estimateSessionMicro,
@@ -147,6 +148,18 @@ describe('display conversion', () => {
   it('treats nonsense as nothing', () => {
     expect(fromEnergy(-1)).toBe(0n)
     expect(fromEnergy(Number.NaN)).toBe(0n)
+  })
+})
+
+describe('ceilDiv', () => {
+  it('refuses a non-positive divisor rather than dividing by zero', () => {
+    expect(() => ceilDiv(10n, 0n)).toThrow(RangeError)
+    expect(() => ceilDiv(10n, -1n)).toThrow(RangeError)
+  })
+
+  it('credits nothing for a non-positive amount, so a zero debit stays zero', () => {
+    expect(ceilDiv(0n, 3n)).toBe(0n)
+    expect(ceilDiv(-4n, 3n)).toBe(0n)
   })
 })
 

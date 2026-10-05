@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
+    "test:perf": "vitest run --project performance --disable-console-intercept",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,vue,json,md,mjs,yml,yaml}\"",

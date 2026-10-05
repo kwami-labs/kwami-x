@@ -89,6 +89,10 @@ describe('the clock', () => {
     expect(timeRemainingRatio(s, T0 + 1_000)).toBe(0)
   })
 
+  it('is zero when the window has no length, rather than dividing by zero', () => {
+    expect(timeRemainingRatio(session({ startedAt: T0, expiresAt: T0 }), T0)).toBe(0)
+  })
+
   it('expires exactly on the deadline, not a second later', () => {
     const s = session()
     expect(isExpired(s, T0 + 179)).toBe(false)

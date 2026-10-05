@@ -31,7 +31,7 @@ export type EnergyOp =
   | { kind: 'codegen' }
 
 /** Divide, rounding away from zero, so a debit is never rounded to nothing. */
-function ceilDiv(amount: bigint, divisor: bigint): bigint {
+export function ceilDiv(amount: bigint, divisor: bigint): bigint {
   if (divisor <= 0n) throw new RangeError('divisor must be positive')
   if (amount <= 0n) return 0n
   return (amount + divisor - 1n) / divisor

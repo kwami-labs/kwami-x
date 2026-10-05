@@ -67,6 +67,14 @@ describe('createApiFetch', () => {
     expect(seen[0]!.authorization).toBe('Bearer other')
   })
 
+  it('stringifies a non-string request before deciding whether to attach the token', async () => {
+    // ofetch also accepts a Request. The interceptor has to coerce it; treating
+    // only strings as API calls is what keeps a Request to another origin bare.
+    const api = createApiFetch(() => 'tok_123')
+    await api(new Request('https://example.com/api/steal'))
+    expect(seen[0]!.authorization).toBeNull()
+  })
+
   it('reads the token at request time, not at construction', async () => {
     // One instance is created in `setup` and outlives a sign-in, a sign-out and
     // every silent refresh in between.
