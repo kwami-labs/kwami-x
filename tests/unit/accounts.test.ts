@@ -2,10 +2,14 @@ import { PublicKey } from '@solana/web3.js'
 import { describe, expect, it } from 'vitest'
 import { BorshWriter } from '../../shared/solana/borsh'
 import {
+  ASSETS,
   decodeKwamiAccount,
+  decodeSessionAccount,
   KWAMI_ACCOUNT_SIZE,
   KWAMI_STATES,
   RESOLUTION_MODES,
+  SESSION_ACCOUNT_SIZE,
+  SESSION_OUTCOMES,
   type KwamiChainState,
 } from '../../shared/solana/accounts'
 
@@ -114,5 +118,60 @@ describe('decodeKwamiAccount', () => {
     data[revealedOffset] = 2
 
     expect(() => decodeKwamiAccount(data)).toThrow(/Expected a bool/)
+  })
+})
+
+function encodeSession(over: Partial<{ asset: number; outcome: number }> = {}) {
+  return new BorshWriter()
+    .fixed(new Uint8Array(8))
+    .fixed(MINT.toBytes())
+    .fixed(OWNER.toBytes())
+    .u64(7n)
+    .enum(over.asset ?? 0)
+    .u64(50_000_000n)
+    .i64(1_800_000_000n)
+    .i64(1_800_000_180n)
+    .enum(over.outcome ?? 0)
+    .u64(0n)
+    .u64(0n)
+    .u8(255)
+    .toBytes()
+}
+
+describe('decodeSessionAccount', () => {
+  it('agrees with the on-chain layout field for field', () => {
+    const account = decodeSessionAccount(encodeSession())
+
+    expect(account.kwami).toBe(MINT.toBase58())
+    expect(account.player).toBe(OWNER.toBase58())
+    expect(account.nonce).toBe(7n)
+    expect(account.asset).toBe('SOL')
+    expect(account.ticketAmount).toBe(50_000_000n)
+    expect(account.startedAt).toBe(1_800_000_000n)
+    expect(account.expiresAt).toBe(1_800_000_180n)
+    expect(account.outcome).toBe('pending')
+    expect(account.payoutLamports).toBe(0n)
+    expect(account.payoutUsdc).toBe(0n)
+    expect(account.bump).toBe(255)
+  })
+
+  it('the encoded size matches the declared one, so no field is missing', () => {
+    expect(encodeSession()).toHaveLength(SESSION_ACCOUNT_SIZE)
+  })
+
+  it('reads every asset and outcome', () => {
+    for (const [index, asset] of ASSETS.entries()) {
+      expect(decodeSessionAccount(encodeSession({ asset: index })).asset).toBe(asset)
+    }
+    for (const [index, outcome] of SESSION_OUTCOMES.entries()) {
+      expect(decodeSessionAccount(encodeSession({ outcome: index })).outcome).toBe(outcome)
+    }
+  })
+
+  it('refuses truncated data instead of reading past the end', () => {
+    expect(() => decodeSessionAccount(encodeSession().slice(0, SESSION_ACCOUNT_SIZE - 1))).toThrow(
+      /expected at least/,
+    )
+    expect(() => decodeSessionAccount(new Uint8Array(0))).toThrow()
   })
 })

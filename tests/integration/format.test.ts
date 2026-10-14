@@ -39,6 +39,10 @@ describe('formatUsdc', () => {
     expect(formatUsdc(5_000_000n)).toBe('5.00 USDC')
     expect(formatUsdc(1_234_560_000n)).toBe('1,234.56 USDC')
   })
+
+  it('can drop the symbol', () => {
+    expect(formatUsdc(5_000_000n, { symbol: false })).toBe('5.00')
+  })
 })
 
 describe('formatUsd', () => {
@@ -115,5 +119,12 @@ describe('relativeTime', () => {
   it('describes the past and the future', () => {
     expect(relativeTime(Date.now() - 120_000)).toMatch(/2 minutes ago/)
     expect(relativeTime(Date.now() + 3 * 3_600_000)).toMatch(/in 3 hours/)
+  })
+
+  it('picks the largest unit that still fits', () => {
+    expect(relativeTime(Date.now() - 5_000)).toMatch(/second/)
+    expect(relativeTime(Date.now() - 2 * 86_400_000)).toMatch(/day/)
+    expect(relativeTime(Date.now() - 40 * 86_400_000)).toMatch(/month/)
+    expect(relativeTime(Date.now() - 400 * 86_400_000)).toMatch(/year/)
   })
 })
