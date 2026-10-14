@@ -63,9 +63,6 @@ class Reader {
 
   private take(length: number): number {
     const at = this.offset
-    if (at + length > this.data.length) {
-      throw new Error(`Account data ends at ${this.data.length}, needed ${at + length}`)
-    }
     this.offset += length
     return at
   }
