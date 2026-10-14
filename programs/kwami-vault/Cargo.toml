@@ -1,6 +1,6 @@
 [package]
 name = "kwami-vault"
-version = "3.2.1"
+version = "3.2.2"
 description = "Kwami v3 vault: ticketed voice challenges with on-chain pots, commit-reveal wins and pluggable game extensions."
 edition = "2021"
 license = "Apache-2.0"
@@ -32,6 +32,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"
 [dependencies]
 anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
 anchor-spl = "1.2.0"
-solana-instructions-sysvar = "3"
+solana-instructions-sysvar = "5"
 solana-sdk-ids = "3"
 solana-sha256-hasher = { version = "3", features = ["sha2"] }

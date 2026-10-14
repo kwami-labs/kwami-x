@@ -71,7 +71,7 @@ export function decodeEvents(buffer: string): { events: CodegenEvent[]; rest: st
   const lines = buffer.split('\n')
   // The trailing element is whatever followed the last newline — an empty
   // string when the buffer ended cleanly, a partial record otherwise.
-  const rest = lines.pop() ?? ''
+  const rest = lines.pop()!
   const events: CodegenEvent[] = []
 
   for (const line of lines) {

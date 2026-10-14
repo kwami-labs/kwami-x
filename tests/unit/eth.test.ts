@@ -6,7 +6,7 @@ import { eip191Digest, recoverEthAddress, toChecksumAddress } from '~~/server/ut
 /** Sign a message the way MetaMask's `personal_sign` does: r || s || v, v last. */
 function personalSign(message: string, privateKey: Uint8Array): string {
   const digest = eip191Digest(message)
-  // Noble recovered is recovery || r || s; wallets serialise r || s || v.
+  // Noble 2 `format: 'recovered'` is recovery || r || s; wallets serialise r || s || v.
   const recovered = secp256k1.sign(digest, privateKey, { prehash: false, format: 'recovered' })
   const v = recovered[0]! + 27
   return `0x${Buffer.from(recovered.subarray(1)).toString('hex')}${v.toString(16)}`
@@ -52,6 +52,9 @@ describe('recoverEthAddress', () => {
     expect(recoverEthAddress('hello', '0x00')).toBeNull()
     expect(recoverEthAddress('hello', 'not hex at all')).toBeNull()
     expect(recoverEthAddress('hello', `0x${'0'.repeat(130)}`)).toBeNull()
+    // 130 hex chars that decode to fewer than 65 bytes — the length check on
+    // the string is not enough when the hex is dirty.
+    expect(recoverEthAddress('hello', `0x${'0'.repeat(129)}g`)).toBeNull()
   })
 
   it('returns null for an out-of-range recovery byte', () => {
