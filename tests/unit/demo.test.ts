@@ -17,7 +17,8 @@ vi.stubGlobal('createError', (opts: { statusCode: number; statusMessage: string 
   return error
 })
 
-const { DEMO_KWAMIS, demoSessions, isDemoMode, assertNotDemo } = await import('~~/server/utils/demo')
+const { DEMO_KWAMIS, buildDemoKwami, demoSessions, isDemoMode, assertNotDemo } =
+  await import('~~/server/utils/demo')
 
 /**
  * The demo dataset is what a fresh clone shows before any infrastructure
@@ -80,6 +81,29 @@ describe('demo dataset', () => {
 
   it('uses distinct mints, since they key every lookup and colour palette', () => {
     expect(new Set(DEMO_KWAMIS.map((k) => k.mint)).size).toBe(DEMO_KWAMIS.length)
+  })
+
+  it('derives a high-water mark and a full vitality when none was stored', () => {
+    const fresh = buildDemoKwami({
+      mint: 'Kw7New111111111111111111111111111111111111111',
+      name: 'Blank Slate',
+      tagline: 'Nothing has happened yet.',
+      renderer: 'blob-xyz',
+    })
+    expect(fresh.high_water_mark_cents).toBe(fresh.value_cents)
+    expect(fresh.vitality).toBe(1)
+    expect(fresh.win_rate).toBe(0)
+  })
+
+  it('treats a played Kwami with no recorded wins as a zero rate, not a crash', () => {
+    const unwon = buildDemoKwami({
+      mint: 'Kw8Try111111111111111111111111111111111111111',
+      name: 'Tried',
+      tagline: 'Many attempts, no wins.',
+      renderer: 'blob-xyz',
+      sessions_played: 10,
+    })
+    expect(unwon.win_rate).toBe(0)
   })
 })
 
