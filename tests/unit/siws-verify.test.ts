@@ -17,16 +17,16 @@ vi.mock('~~/server/utils/solana', () => ({
   verifySolanaSignature: (...args: unknown[]) => verifySolanaSignature(...args),
 }))
 
-vi.stubGlobal('useRuntimeConfig', () => ({
-  public: { siteUrl: 'https://x.kwami.io', solanaCluster: 'devnet' },
-}))
+const runtime = { public: { siteUrl: 'https://x.kwami.io', solanaCluster: 'devnet' } }
+vi.stubGlobal('useRuntimeConfig', () => runtime)
 vi.stubGlobal('createError', (opts: { statusCode: number; statusMessage: string }) => {
   const error = new Error(opts.statusMessage) as Error & { statusCode: number }
   error.statusCode = opts.statusCode
   return error
 })
+vi.stubGlobal('getRequestURL', (event: { host: string }) => ({ host: event.host }))
 
-const { verifySignedSiws } = await import('~~/server/utils/siws-verify')
+const { verifySignedSiws, siwsExpectedDomains } = await import('~~/server/utils/siws-verify')
 
 const ADDRESS = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'
 
@@ -121,5 +121,29 @@ describe('verifySignedSiws', () => {
       statusCode: 400,
       message: /chain id/i,
     })
+  })
+
+  it('treats a missing cluster as devnet rather than skipping the check', async () => {
+    runtime.public.solanaCluster = ''
+    try {
+      await expect(verifySignedSiws(signed())).resolves.toEqual({ address: ADDRESS })
+    } finally {
+      runtime.public.solanaCluster = 'devnet'
+    }
+  })
+})
+
+describe('siwsExpectedDomains', () => {
+  it('is just the site host when the request agrees with it', () => {
+    expect(siwsExpectedDomains({ host: 'x.kwami.io' } as never)).toEqual(['x.kwami.io'])
+  })
+
+  it('accepts the request host as well when they disagree', () => {
+    // A tunnel or 127.0.0.1 login would otherwise be rejected for disagreeing
+    // with a localhost siteUrl.
+    expect(siwsExpectedDomains({ host: 'abc.ngrok-free.app' } as never)).toEqual([
+      'x.kwami.io',
+      'abc.ngrok-free.app',
+    ])
   })
 })

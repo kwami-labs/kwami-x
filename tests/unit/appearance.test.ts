@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   KWAMI_PALETTES,
+  hexToHsl,
   hslToHex,
   isHexColor,
   paletteFor,
@@ -142,6 +143,11 @@ describe('paletteFor', () => {
     expect(paletteFor({ mint, appearance: null })).toEqual(paletteFromMint(mint))
   })
 
+  it('hashes an empty mint when the row has none, rather than crashing', () => {
+    expect(paletteFor({})).toEqual(paletteFromMint(''))
+    expect(paletteFor({ mint: null })).toEqual(paletteFromMint(''))
+  })
+
   it('falls back entirely rather than pairing one chosen colour with a default', () => {
     // Half-applying would produce a combination nobody picked, which is worse
     // than the derived palette the Kwami would otherwise have had.
@@ -150,6 +156,19 @@ describe('paletteFor', () => {
     expect(paletteFor({ mint, appearance: { colorA: '#ff0000', colorB: 'green' } })).toEqual(
       paletteFromMint(mint),
     )
+  })
+})
+
+describe('hexToHsl', () => {
+  it('round-trips the primaries and an achromatic grey', () => {
+    // Grey is the `d === 0` path; blue is the channel that is neither red nor green.
+    const grey = hexToHsl('#808080')
+    expect(grey.h).toBe(0)
+    expect(grey.s).toBe(0)
+    expect(grey.l).toBeCloseTo(0.5, 2)
+    expect(hexToHsl('#0000ff').h).toBe(240)
+    expect(hexToHsl('#ff0000').h).toBe(0)
+    expect(hexToHsl('#00ff00').h).toBe(120)
   })
 })
 
