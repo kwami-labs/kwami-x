@@ -3,6 +3,13 @@
 All notable changes to Kwami v3 are documented here. This file is generated
 from the commit history by semantic-release — do not edit it by hand.
 
+## [3.2.2](https://github.com/kwami-labs/kwami-x/compare/v3.2.1...v3.2.2) (2026-10-14)
+
+### Build & Dependencies
+
+- **deps:** bump the minor-and-patch group across 1 directory with 6 updates ([#70](https://github.com/kwami-labs/kwami-x/issues/70)) ([09eda85](https://github.com/kwami-labs/kwami-x/commit/09eda85ff3bee973d6193d58f91660f82c805b94))
+- **program:** bump solana-instructions-sysvar in /programs ([#58](https://github.com/kwami-labs/kwami-x/issues/58)) ([457d0b8](https://github.com/kwami-labs/kwami-x/commit/457d0b8c61968cbc17bbdc3d835bc0c26ea0a119))
+
 ## [3.2.1](https://github.com/kwami-labs/kwami-x/compare/v3.2.0...v3.2.1) (2026-09-17)
 
 ### Bug Fixes
