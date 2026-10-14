@@ -3,6 +3,14 @@
 All notable changes to Kwami v3 are documented here. This file is generated
 from the commit history by semantic-release — do not edit it by hand.
 
+## [3.2.3](https://github.com/kwami-labs/kwami-x/compare/v3.2.2...v3.2.3) (2026-10-14)
+
+### Build & Dependencies
+
+- **deps:** bump @vueuse/core from 14.4.0 to 15.0.0 ([#63](https://github.com/kwami-labs/kwami-x/issues/63)) ([e2806ae](https://github.com/kwami-labs/kwami-x/commit/e2806ae2c4dfdda115b7a3d122b891186f012848))
+- **deps:** bump @vueuse/nuxt from 14.4.0 to 15.0.0 ([#62](https://github.com/kwami-labs/kwami-x/issues/62)) ([b378b14](https://github.com/kwami-labs/kwami-x/commit/b378b14a87ae8ce26d78c7d4e46d5ba1b2052409))
+- **deps:** bump the nuxt group across 1 directory with 5 updates ([#69](https://github.com/kwami-labs/kwami-x/issues/69)) ([a9ebd29](https://github.com/kwami-labs/kwami-x/commit/a9ebd29ea4b1ef5804628e9210f61b69efd67c31))
+
 ## [3.2.2](https://github.com/kwami-labs/kwami-x/compare/v3.2.1...v3.2.2) (2026-10-14)
 
 ### Build & Dependencies
