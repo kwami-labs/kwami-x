@@ -52,6 +52,9 @@ describe('recoverEthAddress', () => {
     expect(recoverEthAddress('hello', '0x00')).toBeNull()
     expect(recoverEthAddress('hello', 'not hex at all')).toBeNull()
     expect(recoverEthAddress('hello', `0x${'0'.repeat(130)}`)).toBeNull()
+    // 130 hex chars that decode to fewer than 65 bytes — the length check on
+    // the string is not enough when the hex is dirty.
+    expect(recoverEthAddress('hello', `0x${'0'.repeat(129)}g`)).toBeNull()
   })
 
   it('returns null for an out-of-range recovery byte', () => {

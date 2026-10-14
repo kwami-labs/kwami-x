@@ -45,7 +45,7 @@ export interface DemoKwami {
 
 const SOL_USD = 150
 
-function build(
+export function buildDemoKwami(
   partial: Partial<DemoKwami> & Pick<DemoKwami, 'mint' | 'name' | 'tagline' | 'renderer'>,
 ): DemoKwami {
   const lamports = partial.balance_lamports ?? 0
@@ -86,7 +86,7 @@ function build(
 }
 
 export const DEMO_KWAMIS: DemoKwami[] = [
-  build({
+  buildDemoKwami({
     mint: 'Kw1Ora111111111111111111111111111111111111111',
     appearance: { colorA: '#7c5cff', colorB: '#3ddc97' },
     name: 'Oracle of Small Talk',
@@ -99,7 +99,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
     sessions_played: 47,
     sessions_won: 0,
   }),
-  build({
+  buildDemoKwami({
     mint: 'Kw2Vlt111111111111111111111111111111111111111',
     appearance: { colorA: '#7ee7ff', colorB: '#e6f1ff' },
     name: 'The Vault Keeper',
@@ -113,7 +113,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
     sessions_played: 132,
     sessions_won: 0,
   }),
-  build({
+  buildDemoKwami({
     mint: 'Kw3Shr111111111111111111111111111111111111111',
     appearance: { colorA: '#ff5cb8', colorB: '#a77bff' },
     name: 'Shardsong',
@@ -127,7 +127,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
     sessions_played: 88,
     sessions_won: 1,
   }),
-  build({
+  buildDemoKwami({
     mint: 'Kw4Gen111111111111111111111111111111111111111',
     appearance: { colorA: '#f5c451', colorB: '#ff9d3d' },
     name: 'First Light',
@@ -142,7 +142,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
     sessions_played: 301,
     sessions_won: 4,
   }),
-  build({
+  buildDemoKwami({
     mint: 'Kw5Hzn111111111111111111111111111111111111111',
     appearance: { colorA: '#1f6feb', colorB: '#00d4ff' },
     name: 'Event Horizon',
@@ -155,7 +155,7 @@ export const DEMO_KWAMIS: DemoKwami[] = [
     sessions_played: 219,
     sessions_won: 0,
   }),
-  build({
+  buildDemoKwami({
     mint: 'Kw6Ash111111111111111111111111111111111111111',
     appearance: { colorA: '#8b93a7', colorB: '#dfe4ef' },
     name: 'Ashfall',

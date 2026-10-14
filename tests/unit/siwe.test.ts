@@ -61,4 +61,43 @@ describe('SIWE messages', () => {
     expect(SIWE_STATEMENT).toMatch(/identity only/i)
     expect(SIWE_STATEMENT).toMatch(/Solana/)
   })
+
+  it('omits a missing statement and writes an expiration when one is set', () => {
+    const text = formatSiweMessage({
+      ...BASE,
+      statement: undefined,
+      expirationTime: '2026-09-04T12:05:00.000Z',
+    })
+    expect(text).not.toContain(SIWE_STATEMENT)
+    expect(text).toContain('Expiration Time: 2026-09-04T12:05:00.000Z')
+    expect(parseSiweMessage(text)?.expirationTime).toBe('2026-09-04T12:05:00.000Z')
+    expect(parseSiweMessage(text)?.statement).toBeUndefined()
+  })
+
+  it('returns null when a required field is missing rather than inventing one', () => {
+    const lines = formatSiweMessage(BASE)
+      .split('\n')
+      .filter((l) => !l.startsWith('URI:'))
+    expect(parseSiweMessage(lines.join('\n'))).toBeNull()
+  })
+
+  it('rejects an unsupported version and a malformed timestamp', () => {
+    const now = new Date('2026-09-04T12:01:00.000Z')
+    const ctx = { expectedDomain: 'x.kwami.io', expectedNonce: 'nonce-1', now }
+    expect(validateSiweMessage({ ...BASE, version: '2' }, ctx)).toMatchObject({
+      valid: false,
+      reason: /version/i,
+    })
+    expect(validateSiweMessage({ ...BASE, issuedAt: 'yesterday' }, ctx)).toMatchObject({
+      valid: false,
+      reason: /Issued At/i,
+    })
+  })
+
+  it('reads the clock itself when the caller does not pass one', () => {
+    const fresh = { ...BASE, issuedAt: new Date().toISOString() }
+    expect(validateSiweMessage(fresh, { expectedDomain: 'x.kwami.io', expectedNonce: 'nonce-1' }).valid).toBe(
+      true,
+    )
+  })
 })
