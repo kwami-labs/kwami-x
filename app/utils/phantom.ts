@@ -146,10 +146,7 @@ export function waitForPhantom(timeoutMs = 3000): Promise<PhantomProvider | null
   if (typeof window === 'undefined') return Promise.resolve(null)
 
   return new Promise((resolve) => {
-    let settled = false
     const finish = (p: PhantomProvider | null) => {
-      if (settled) return
-      settled = true
       window.removeEventListener('phantom#initialized', onInit)
       clearInterval(poll)
       clearTimeout(timer)
