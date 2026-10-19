@@ -42,7 +42,7 @@
     "@nuxtjs/color-mode": "^4.0.1",
     "@pinia/nuxt": "^1.0.2",
     "@solana/spl-token": "^0.4.14",
-    "@solana/web3.js": "^1.99.0",
+    "@solana/web3.js": "^3.1.0",
     "@supabase/supabase-js": "^2.117.3",
     "@vueuse/core": "^15.0.0",
     "@vueuse/nuxt": "^15.0.0",
