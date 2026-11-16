@@ -10,7 +10,7 @@
         "@nuxtjs/color-mode": "^4.1.0",
         "@pinia/nuxt": "^1.0.3",
         "@solana/spl-token": "^0.4.14",
-        "@solana/web3.js": "^3.2.0",
+        "@solana/web3.js": "^3.2.1",
         "@supabase/supabase-js": "^2.119.0",
         "@vueuse/core": "^15.0.0",
         "@vueuse/nuxt": "^15.0.0",
@@ -628,7 +628,7 @@
 
     "@solana/transactions": ["@solana/transactions@8.6.0", "", { "dependencies": { "@solana/addresses": "8.6.0", "@solana/codecs-core": "8.6.0", "@solana/codecs-data-structures": "8.6.0", "@solana/codecs-numbers": "8.6.0", "@solana/codecs-strings": "8.6.0", "@solana/errors": "8.6.0", "@solana/functional": "8.6.0", "@solana/instructions": "8.6.0", "@solana/keys": "8.6.0", "@solana/nominal-types": "8.6.0", "@solana/rpc-types": "8.6.0", "@solana/transaction-messages": "8.6.0" }, "peerDependencies": { "typescript": ">=5.4.0" }, "optionalPeers": ["typescript"] }, "sha512-m2i0dxDtB9mGqhJd714OQpKzGFp9cQbU80kwIBFflOrHdZ2cJzZ61xjGe+vegz/WGsqPec604pUbHKXXIFkNjg=="],
 
-    "@solana/web3.js": ["@solana/web3.js@3.2.0", "", { "dependencies": { "@noble/curves": "^1.4.2", "@noble/hashes": "^1.4.0", "@solana-program/address-lookup-table": "^0.16.0", "@solana-program/compute-budget": "^0.20.0", "@solana-program/loader-v3": "^0.8.0", "@solana-program/stake": "0.9.0", "@solana-program/system": "^0.16.0", "@solana/assertions": "^8.6.0", "@solana/fast-stable-stringify": "^8.6.0", "@solana/kit": "^8.6.0", "@solana/rpc-spec-types": "^8.6.0", "@solana/signers": "^8.6.0" } }, "sha512-cOJn9j/pxCTAzvc28FDrI488Sw4z8lR297CucPWP1C/N7MGmUJfQYHrLABxQNtgGlvKeOLuM/YtSccSYv+pT3A=="],
+    "@solana/web3.js": ["@solana/web3.js@3.2.1", "", { "dependencies": { "@noble/curves": "^1.4.2", "@noble/hashes": "^1.4.0", "@solana-program/address-lookup-table": "^0.16.0", "@solana-program/compute-budget": "^0.20.0", "@solana-program/loader-v3": "^0.8.0", "@solana-program/stake": "0.9.0", "@solana-program/system": "^0.16.0", "@solana/assertions": "^8.6.0", "@solana/fast-stable-stringify": "^8.6.0", "@solana/kit": "^8.6.0", "@solana/rpc-spec-types": "^8.6.0", "@solana/signers": "^8.6.0" } }, "sha512-1L5VtTSgYgfPdwko+enWQ13IS6suTS0Fm/bVROe5dYKr7JbSUmYGNFUxK36kgzfm+kEaCr33qyOKioTaZLEh3g=="],
 
     "@speed-highlight/core": ["@speed-highlight/core@1.2.24", "", {}, "sha512-qeW2e1l78afw8VhRPfPQ1Gjj+KU5XFQ/OFV5ti6eTa9bruO7mJyZtA4vw0ofqmA3tKCkROE9xLk3VZoeRc98nw=="],
 
