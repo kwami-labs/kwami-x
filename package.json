@@ -54,14 +54,14 @@
     "three": "^0.187.0",
     "tweetnacl": "^1.0.3",
     "vue": "^3.5.45",
-    "vue-router": "^5.4.0",
+    "vue-router": "^5.5.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
     "@nuxt/eslint": "^1.17.0",
-    "@nuxt/test-utils": "^4.3.4",
+    "@nuxt/test-utils": "^4.4.0",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^11.0.1",
