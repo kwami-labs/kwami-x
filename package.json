@@ -66,8 +66,8 @@
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^11.0.1",
     "@types/three": "^0.187.0",
-    "@vitest/coverage-v8": "^5.1.0",
-    "@vue/test-utils": "^2.5.1",
+    "@vitest/coverage-v8": "^5.1.1",
+    "@vue/test-utils": "^2.6.0",
     "conventional-changelog-conventionalcommits": "9.3.1",
     "eslint": "10.15.0",
     "happy-dom": "^21.0.4",
@@ -76,7 +76,7 @@
     "prettier": "^3.10.1",
     "semantic-release": "^25.0.9",
     "typescript": "^5.9.3",
-    "vitest": "^5.1.0",
+    "vitest": "^5.1.1",
     "vue-tsc": "^3.3.14"
   },
   "lint-staged": {
